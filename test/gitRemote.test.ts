@@ -3,14 +3,18 @@ import { parseGitHubRepoFromRemote } from "../src/gitRemote";
 
 describe("parseGitHubRepoFromRemote", () => {
   it("parses git@github.com:owner/repo.git", () => {
-    expect(parseGitHubRepoFromRemote("git@github.com:arnac-io/arnac.git")).toEqual({
+    expect(
+      parseGitHubRepoFromRemote("git@github.com:arnac-io/arnac.git")
+    ).toEqual({
       owner: "arnac-io",
       repo: "arnac",
     });
   });
 
   it("parses ssh://git@github.com/owner/repo", () => {
-    expect(parseGitHubRepoFromRemote("ssh://git@github.com/arnac-io/arnac")).toEqual({
+    expect(
+      parseGitHubRepoFromRemote("ssh://git@github.com/arnac-io/arnac")
+    ).toEqual({
       owner: "arnac-io",
       repo: "arnac",
     });
@@ -31,10 +35,12 @@ describe("parseGitHubRepoFromRemote", () => {
   });
 
   it("strips .git for https", () => {
-    expect(parseGitHubRepoFromRemote("https://github.com/foo/bar.git")).toEqual({
-      owner: "foo",
-      repo: "bar",
-    });
+    expect(parseGitHubRepoFromRemote("https://github.com/foo/bar.git")).toEqual(
+      {
+        owner: "foo",
+        repo: "bar",
+      }
+    );
   });
 
   it("returns undefined for empty", () => {
@@ -43,10 +49,14 @@ describe("parseGitHubRepoFromRemote", () => {
   });
 
   it("returns undefined for non-GitHub host", () => {
-    expect(parseGitHubRepoFromRemote("https://gitlab.com/foo/bar")).toBeUndefined();
+    expect(
+      parseGitHubRepoFromRemote("https://gitlab.com/foo/bar")
+    ).toBeUndefined();
   });
 
   it("returns undefined for incomplete path", () => {
-    expect(parseGitHubRepoFromRemote("https://github.com/solo")).toBeUndefined();
+    expect(
+      parseGitHubRepoFromRemote("https://github.com/solo")
+    ).toBeUndefined();
   });
 });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatPrLabels, parseHotfixRunMode, truncateRunLogTail } from "../src/hotfixRunHelpers";
+import {
+  formatPrLabels,
+  parseHotfixRunMode,
+  truncateRunLogTail,
+} from "../src/hotfixRunHelpers";
 
 describe("parseHotfixRunMode", () => {
   it("maps background and defaults everything else to integratedTerminal", () => {

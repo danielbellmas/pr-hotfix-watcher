@@ -39,34 +39,54 @@ describe("isOpenOrMergedSearchItem", () => {
         searchItem({
           state: "closed",
           pull_request: { merged_at: "2024-01-01T00:00:00Z" },
-        }),
-      ),
+        })
+      )
     ).toBe(true);
   });
   it("rejects closed without merge", () => {
-    expect(isOpenOrMergedSearchItem(searchItem({ state: "closed", pull_request: {} }))).toBe(false);
     expect(
-      isOpenOrMergedSearchItem(searchItem({ state: "closed", pull_request: { merged_at: null } })),
+      isOpenOrMergedSearchItem(
+        searchItem({ state: "closed", pull_request: {} })
+      )
+    ).toBe(false);
+    expect(
+      isOpenOrMergedSearchItem(
+        searchItem({ state: "closed", pull_request: { merged_at: null } })
+      )
     ).toBe(false);
   });
 });
 
 describe("isOpenOrMergedPull", () => {
   it("accepts open", () => {
-    expect(isOpenOrMergedPull(pull({ state: "open", merged_at: null }))).toBe(true);
+    expect(isOpenOrMergedPull(pull({ state: "open", merged_at: null }))).toBe(
+      true
+    );
   });
   it("accepts merged", () => {
-    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" }))).toBe(true);
+    expect(
+      isOpenOrMergedPull(
+        pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" })
+      )
+    ).toBe(true);
   });
   it("rejects closed without merge", () => {
-    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: null }))).toBe(false);
+    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: null }))).toBe(
+      false
+    );
   });
 
   it("treats merged_at as authoritative over state for inclusion", () => {
     expect(
-      isOpenOrMergedPull(pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" })),
+      isOpenOrMergedPull(
+        pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" })
+      )
     ).toBe(true);
-    expect(isOpenOrMergedPull(pull({ state: "open", merged_at: "2024-01-01T00:00:00Z" }))).toBe(true);
+    expect(
+      isOpenOrMergedPull(
+        pull({ state: "open", merged_at: "2024-01-01T00:00:00Z" })
+      )
+    ).toBe(true);
   });
 });
 

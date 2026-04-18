@@ -1,32 +1,69 @@
 import { describe, expect, it } from "vitest";
-import { buildHotfixCliSuffix, normalizeHotfixCliOptions } from "../src/hotfixCli";
+import {
+  buildHotfixCliSuffix,
+  normalizeHotfixCliOptions,
+} from "../src/hotfixCli";
 
-const defaults = { env: "pre" as const, draft: false, criticalFastTrack: false };
+const defaults = {
+  env: "pre" as const,
+  draft: false,
+  criticalFastTrack: false,
+};
 
 describe("buildHotfixCliSuffix", () => {
   it("always includes --env", () => {
     expect(buildHotfixCliSuffix(defaults)).toBe("--env pre");
-    expect(buildHotfixCliSuffix({ env: "prod", draft: false, criticalFastTrack: false })).toBe("--env prod");
-    expect(buildHotfixCliSuffix({ env: "both", draft: false, criticalFastTrack: false })).toBe("--env pre --env prod");
+    expect(
+      buildHotfixCliSuffix({
+        env: "prod",
+        draft: false,
+        criticalFastTrack: false,
+      })
+    ).toBe("--env prod");
+    expect(
+      buildHotfixCliSuffix({
+        env: "both",
+        draft: false,
+        criticalFastTrack: false,
+      })
+    ).toBe("--env pre --env prod");
   });
 
   it("adds --draft when enabled", () => {
-    expect(buildHotfixCliSuffix({ env: "pre", draft: true, criticalFastTrack: false })).toBe("--env pre --draft");
+    expect(
+      buildHotfixCliSuffix({
+        env: "pre",
+        draft: true,
+        criticalFastTrack: false,
+      })
+    ).toBe("--env pre --draft");
   });
 
   it("adds --critical-fast-track when enabled", () => {
-    expect(buildHotfixCliSuffix({ env: "pre", draft: false, criticalFastTrack: true })).toBe(
-      "--env pre --critical-fast-track",
-    );
+    expect(
+      buildHotfixCliSuffix({
+        env: "pre",
+        draft: false,
+        criticalFastTrack: true,
+      })
+    ).toBe("--env pre --critical-fast-track");
   });
 
   it("combines flags", () => {
-    expect(buildHotfixCliSuffix({ env: "prod", draft: true, criticalFastTrack: true })).toBe(
-      "--env prod --draft --critical-fast-track",
-    );
-    expect(buildHotfixCliSuffix({ env: "both", draft: true, criticalFastTrack: false })).toBe(
-      "--env pre --env prod --draft",
-    );
+    expect(
+      buildHotfixCliSuffix({
+        env: "prod",
+        draft: true,
+        criticalFastTrack: true,
+      })
+    ).toBe("--env prod --draft --critical-fast-track");
+    expect(
+      buildHotfixCliSuffix({
+        env: "both",
+        draft: true,
+        criticalFastTrack: false,
+      })
+    ).toBe("--env pre --env prod --draft");
   });
 });
 
@@ -37,7 +74,9 @@ describe("normalizeHotfixCliOptions", () => {
   });
 
   it("accepts valid env and booleans", () => {
-    expect(normalizeHotfixCliOptions({ env: "prod", draft: true }, defaults)).toEqual({
+    expect(
+      normalizeHotfixCliOptions({ env: "prod", draft: true }, defaults)
+    ).toEqual({
       env: "prod",
       draft: true,
       criticalFastTrack: false,
@@ -51,7 +90,9 @@ describe("normalizeHotfixCliOptions", () => {
 
   it("rejects invalid env", () => {
     // @ts-expect-error deliberate bad value from persisted state
-    expect(normalizeHotfixCliOptions({ env: "staging" }, defaults)).toEqual(defaults);
+    expect(normalizeHotfixCliOptions({ env: "staging" }, defaults)).toEqual(
+      defaults
+    );
   });
 
   it("ignores non-boolean draft and criticalFastTrack from bad persisted JSON", () => {
@@ -59,8 +100,8 @@ describe("normalizeHotfixCliOptions", () => {
       normalizeHotfixCliOptions(
         // @ts-expect-error persisted garbage
         { draft: "yes", criticalFastTrack: 1 },
-        defaults,
-      ),
+        defaults
+      )
     ).toEqual(defaults);
   });
 });

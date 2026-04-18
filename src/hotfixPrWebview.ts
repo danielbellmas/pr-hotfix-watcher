@@ -7,14 +7,22 @@ type FromWebview =
   | { command: "open"; url: string }
   | { command: "ready" }
   | { command: "searchQuery"; query: string }
-  | { command: "hotfixCli"; env?: string; draft?: boolean; criticalFastTrack?: boolean }
+  | {
+      command: "hotfixCli";
+      env?: string;
+      draft?: boolean;
+      criticalFastTrack?: boolean;
+    }
   | { command: "prListView"; statusFilter?: string; sortMode?: string };
 
 export type GithubPrColorScheme = "light" | "dark";
 
 export function activeGithubColorScheme(): GithubPrColorScheme {
   const k = vscode.window.activeColorTheme.kind;
-  if (k === vscode.ColorThemeKind.Light || k === vscode.ColorThemeKind.HighContrastLight) {
+  if (
+    k === vscode.ColorThemeKind.Light ||
+    k === vscode.ColorThemeKind.HighContrastLight
+  ) {
     return "light";
   }
   return "dark";
@@ -35,7 +43,11 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
     };
     const nonce = getNonce();
-    webviewView.webview.html = getHtml(webviewView.webview, nonce, activeGithubColorScheme());
+    webviewView.webview.html = getHtml(
+      webviewView.webview,
+      nonce,
+      activeGithubColorScheme()
+    );
     webviewView.webview.onDidReceiveMessage((msg: FromWebview) => {
       if (msg.command === "ready") {
         this.pushState();
@@ -72,7 +84,11 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
       if (msg.command === "hotfixCli") {
-        const p: { env?: "pre" | "prod" | "both"; draft?: boolean; criticalFastTrack?: boolean } = {};
+        const p: {
+          env?: "pre" | "prod" | "both";
+          draft?: boolean;
+          criticalFastTrack?: boolean;
+        } = {};
         if (msg.env === "pre" || msg.env === "prod" || msg.env === "both") {
           p.env = msg.env;
         }
@@ -138,14 +154,19 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
 
 function getNonce(): string {
   let t = "";
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     t += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return t;
 }
 
-function getHtml(webview: vscode.Webview, nonce: string, initialGithubScheme: GithubPrColorScheme): string {
+function getHtml(
+  webview: vscode.Webview,
+  nonce: string,
+  initialGithubScheme: GithubPrColorScheme
+): string {
   const csp = [
     "default-src 'none'",
     `style-src ${webview.cspSource} 'unsafe-inline'`,

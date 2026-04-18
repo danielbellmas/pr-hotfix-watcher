@@ -20,19 +20,21 @@ export function buildHotfixCliSuffix(opts: HotfixCliOptions): string {
 
 export function normalizeHotfixCliOptions(
   partial: Partial<HotfixCliOptions> | undefined,
-  defaults: HotfixCliOptions,
+  defaults: HotfixCliOptions
 ): HotfixCliOptions {
   return {
     env:
       partial?.env === "prod"
         ? "prod"
         : partial?.env === "both"
-          ? "both"
-          : partial?.env === "pre"
-            ? "pre"
-            : defaults.env,
+        ? "both"
+        : partial?.env === "pre"
+        ? "pre"
+        : defaults.env,
     draft: typeof partial?.draft === "boolean" ? partial.draft : defaults.draft,
     criticalFastTrack:
-      typeof partial?.criticalFastTrack === "boolean" ? partial.criticalFastTrack : defaults.criticalFastTrack,
+      typeof partial?.criticalFastTrack === "boolean"
+        ? partial.criticalFastTrack
+        : defaults.criticalFastTrack,
   };
 }

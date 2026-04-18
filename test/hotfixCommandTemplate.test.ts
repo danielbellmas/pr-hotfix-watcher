@@ -13,7 +13,7 @@ describe("expandHotfixCommandTemplate", () => {
   it("replaces all placeholders and sorts PR numbers", () => {
     const out = expandHotfixCommandTemplate(
       "cd {repoRoot} && echo {owner}/{repo} {prNumbers} {prList} {hotfixSuffix}",
-      base,
+      base
     );
     expect(out).toBe("cd /tmp/repo && echo o/r 1 3 1,3 --env pre");
   });
@@ -23,15 +23,18 @@ describe("expandHotfixCommandTemplate", () => {
       expandHotfixCommandTemplate("cd {repoRoot} && true", {
         ...base,
         prNumbers: [1],
-      }),
+      })
     ).toThrow("fordefiHotfix.commandTemplate must contain {prNumbers}");
   });
 
   it("leaves unknown placeholders untouched", () => {
-    const out = expandHotfixCommandTemplate("{prNumbers} {notAPlaceholder} {repoRoot}", {
-      ...base,
-      prNumbers: [9],
-    });
+    const out = expandHotfixCommandTemplate(
+      "{prNumbers} {notAPlaceholder} {repoRoot}",
+      {
+        ...base,
+        prNumbers: [9],
+      }
+    );
     expect(out).toBe("9 {notAPlaceholder} /tmp/repo");
   });
 

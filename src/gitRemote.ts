@@ -1,6 +1,8 @@
 import * as cp from "node:child_process";
 
-export function parseGitHubRepoFromRemote(url: string): { owner: string; repo: string } | undefined {
+export function parseGitHubRepoFromRemote(
+  url: string
+): { owner: string; repo: string } | undefined {
   const trimmed = url.trim();
   if (!trimmed) {
     return undefined;
@@ -40,7 +42,12 @@ export function parseGitHubRepoFromRemote(url: string): { owner: string; repo: s
 
 export function readOriginRemote(repoRoot: string): string | undefined {
   try {
-    return cp.execSync("git remote get-url origin", { cwd: repoRoot, encoding: "utf8" }).trim();
+    return cp
+      .execSync("git remote get-url origin", {
+        cwd: repoRoot,
+        encoding: "utf8",
+      })
+      .trim();
   } catch {
     return undefined;
   }

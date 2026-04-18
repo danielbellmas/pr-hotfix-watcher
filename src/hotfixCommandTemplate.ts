@@ -8,7 +8,7 @@ export type HotfixCommandPlaceholders = {
 
 export function expandHotfixCommandTemplate(
   template: string,
-  p: HotfixCommandPlaceholders,
+  p: HotfixCommandPlaceholders
 ): string {
   if (!template.includes("{prNumbers}")) {
     throw new Error("fordefiHotfix.commandTemplate must contain {prNumbers}");

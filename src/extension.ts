@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
-import { clearStoredGithubToken, getRepoRoot, storeGitHubToken } from "./config";
+import {
+  clearStoredGithubToken,
+  getRepoRoot,
+  storeGitHubToken,
+} from "./config";
 import { parseGitHubRepoFromRemote, readOriginRemote } from "./gitRemote";
 import { registerHotfixCliOutputChannel } from "./hotfixRun";
 import { HotfixPrWebviewProvider } from "./hotfixPrWebview";
@@ -11,10 +15,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const webviewProvider = new HotfixPrWebviewProvider(provider);
 
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveColorTheme(() => webviewProvider.notifyThemeChanged()),
-    vscode.window.registerWebviewViewProvider(HotfixPrWebviewProvider.viewType, webviewProvider, {
-      webviewOptions: { retainContextWhenHidden: true },
-    }),
+    vscode.window.onDidChangeActiveColorTheme(() =>
+      webviewProvider.notifyThemeChanged()
+    ),
+    vscode.window.registerWebviewViewProvider(
+      HotfixPrWebviewProvider.viewType,
+      webviewProvider,
+      {
+        webviewOptions: { retainContextWhenHidden: true },
+      }
+    ),
     { dispose: () => provider.stopWatch() },
     vscode.commands.registerCommand("fordefiHotfix.setToken", async () => {
       const token = await vscode.window.showInputBox({
@@ -31,38 +41,66 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage("GitHub token saved.");
       await provider.refresh();
     }),
-    vscode.commands.registerCommand("fordefiHotfix.clearStoredToken", async () => {
-      await clearStoredGithubToken(context);
-      void vscode.window.showInformationMessage(
-        "Stored GitHub token removed. Extension will use `gh auth token` when available.",
-      );
-      await provider.refresh();
-    }),
-    vscode.commands.registerCommand("fordefiHotfix.refresh", () => provider.refresh()),
-    vscode.commands.registerCommand("fordefiHotfix.startWatch", () => provider.startWatch()),
-    vscode.commands.registerCommand("fordefiHotfix.stopWatch", () => provider.stopWatch()),
-    vscode.commands.registerCommand("fordefiHotfix.syncRepoFromGit", async () => {
-      const root = getRepoRoot();
-      if (!root) {
-        void vscode.window.showErrorMessage("Open a workspace folder or set fordefiHotfix.repoRoot.");
-        return;
+    vscode.commands.registerCommand(
+      "fordefiHotfix.clearStoredToken",
+      async () => {
+        await clearStoredGithubToken(context);
+        void vscode.window.showInformationMessage(
+          "Stored GitHub token removed. Extension will use `gh auth token` when available."
+        );
+        await provider.refresh();
       }
-      const remote = readOriginRemote(root);
-      if (!remote) {
-        void vscode.window.showErrorMessage(`Could not read git remote origin under ${root}`);
-        return;
+    ),
+    vscode.commands.registerCommand("fordefiHotfix.refresh", () =>
+      provider.refresh()
+    ),
+    vscode.commands.registerCommand("fordefiHotfix.startWatch", () =>
+      provider.startWatch()
+    ),
+    vscode.commands.registerCommand("fordefiHotfix.stopWatch", () =>
+      provider.stopWatch()
+    ),
+    vscode.commands.registerCommand(
+      "fordefiHotfix.syncRepoFromGit",
+      async () => {
+        const root = getRepoRoot();
+        if (!root) {
+          void vscode.window.showErrorMessage(
+            "Open a workspace folder or set fordefiHotfix.repoRoot."
+          );
+          return;
+        }
+        const remote = readOriginRemote(root);
+        if (!remote) {
+          void vscode.window.showErrorMessage(
+            `Could not read git remote origin under ${root}`
+          );
+          return;
+        }
+        const parsed = parseGitHubRepoFromRemote(remote);
+        if (!parsed) {
+          void vscode.window.showErrorMessage(
+            `Unrecognized remote URL: ${remote}`
+          );
+          return;
+        }
+        const cfg = vscode.workspace.getConfiguration("fordefiHotfix");
+        await cfg.update(
+          "owner",
+          parsed.owner,
+          vscode.ConfigurationTarget.Workspace
+        );
+        await cfg.update(
+          "repo",
+          parsed.repo,
+          vscode.ConfigurationTarget.Workspace
+        );
+        void vscode.window.showInformationMessage(
+          `Set repo to ${parsed.owner}/${parsed.repo}`
+        );
+        await provider.refresh();
       }
-      const parsed = parseGitHubRepoFromRemote(remote);
-      if (!parsed) {
-        void vscode.window.showErrorMessage(`Unrecognized remote URL: ${remote}`);
-        return;
-      }
-      const cfg = vscode.workspace.getConfiguration("fordefiHotfix");
-      await cfg.update("owner", parsed.owner, vscode.ConfigurationTarget.Workspace);
-      await cfg.update("repo", parsed.repo, vscode.ConfigurationTarget.Workspace);
-      void vscode.window.showInformationMessage(`Set repo to ${parsed.owner}/${parsed.repo}`);
-      await provider.refresh();
-    }),
+    )
   );
 
   context.subscriptions.push(
@@ -70,7 +108,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (e.affectsConfiguration("fordefiHotfix")) {
         void provider.refresh();
       }
-    }),
+    })
   );
 }
 

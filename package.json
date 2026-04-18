@@ -11,13 +11,10 @@
     "url": "https://github.com/arnac-io/arnac"
   },
   "engines": {
-    "vscode": "^1.93.0"
+    "vscode": "^1.94.0"
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onView:fordefiHotfix.prList"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -141,7 +138,10 @@
         },
         "fordefiHotfix.hotfixRunMode": {
           "type": "string",
-          "enum": ["integratedTerminal", "background"],
+          "enum": [
+            "integratedTerminal",
+            "background"
+          ],
           "default": "integratedTerminal",
           "description": "How to run the hotfix command after merges. **integratedTerminal** — real terminal so you can touch a YubiKey and answer prompts (e.g. press y); success/failure toasts use shell integration when available. **background** — run via extension host (no TTY); good only for fully non-interactive scripts."
         },

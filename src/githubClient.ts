@@ -31,10 +31,7 @@ export function isOpenOrMergedPull(p: GitHubPull): boolean {
 }
 
 export class GitHubError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
+  constructor(message: string, readonly status: number) {
     super(message);
     this.name = "GitHubError";
   }
@@ -43,7 +40,7 @@ export class GitHubError extends Error {
 async function githubJson<T>(
   path: string,
   token: string,
-  init?: RequestInit,
+  init?: RequestInit
 ): Promise<T> {
   const res = await fetch(`https://api.github.com${path}`, {
     ...init,
@@ -76,10 +73,13 @@ export async function searchAuthorPullRequests(
   owner: string,
   repo: string,
   authorLogin: string,
-  perPage: number,
+  perPage: number
 ): Promise<SearchIssueItem[]> {
   const q = `is:pr author:${authorLogin} repo:${owner}/${repo} sort:updated-desc`;
-  const path = `/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(perPage, 100)}`;
+  const path = `/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(
+    perPage,
+    100
+  )}`;
   const data = await githubJson<SearchResult>(path, token);
   return data.items ?? [];
 }
@@ -89,10 +89,13 @@ export async function searchRepoPullRequests(
   owner: string,
   repo: string,
   text: string,
-  perPage: number,
+  perPage: number
 ): Promise<SearchIssueItem[]> {
   const q = `is:pr repo:${owner}/${repo} ${text}`.trim();
-  const path = `/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(Math.max(perPage, 1), 100)}`;
+  const path = `/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(
+    Math.max(perPage, 1),
+    100
+  )}`;
   const data = await githubJson<SearchResult>(path, token);
   return data.items ?? [];
 }
@@ -101,7 +104,10 @@ export async function getPullRequest(
   token: string,
   owner: string,
   repo: string,
-  number: number,
+  number: number
 ): Promise<GitHubPull> {
-  return githubJson<GitHubPull>(`/repos/${owner}/${repo}/pulls/${number}`, token);
+  return githubJson<GitHubPull>(
+    `/repos/${owner}/${repo}/pulls/${number}`,
+    token
+  );
 }

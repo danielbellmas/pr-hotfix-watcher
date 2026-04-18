@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { GitHubError, type GitHubPull } from "../src/githubClient";
 import { phaseFromSettledPulls } from "../src/watchPoll";
 
-function mkPull(over: Partial<GitHubPull> & Pick<GitHubPull, "number">): GitHubPull {
+function mkPull(
+  over: Partial<GitHubPull> & Pick<GitHubPull, "number">
+): GitHubPull {
   return {
     title: "t",
     state: "open",
@@ -42,7 +44,7 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
           number: 10,
           merged_at: "2024-02-01T00:00:00Z",
           state: "closed",
-        }),
+        })
       ),
       fulfilled(mkPull({ number: 20, merged_at: null, state: "open" })),
     ];
@@ -55,10 +57,24 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
   it("all_merged when every PR has merged_at set", () => {
     const target = [1, 2] as const;
     const settled = [
-      fulfilled(mkPull({ number: 1, merged_at: "2024-01-01T00:00:00Z", state: "closed" })),
-      fulfilled(mkPull({ number: 2, merged_at: "2024-01-02T00:00:00Z", state: "closed" })),
+      fulfilled(
+        mkPull({
+          number: 1,
+          merged_at: "2024-01-01T00:00:00Z",
+          state: "closed",
+        })
+      ),
+      fulfilled(
+        mkPull({
+          number: 2,
+          merged_at: "2024-01-02T00:00:00Z",
+          state: "closed",
+        })
+      ),
     ];
-    expect(phaseFromSettledPulls(target, settled)).toEqual({ kind: "all_merged" });
+    expect(phaseFromSettledPulls(target, settled)).toEqual({
+      kind: "all_merged",
+    });
   });
 
   it("stops on 404 for any watched PR", () => {
@@ -67,7 +83,10 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
       rejected(new GitHubError("Not Found", 404)),
       fulfilled(mkPull({ number: 100, merged_at: null, state: "open" })),
     ];
-    expect(phaseFromSettledPulls(target, settled)).toEqual({ kind: "stop_404", prNumber: 99 });
+    expect(phaseFromSettledPulls(target, settled)).toEqual({
+      kind: "stop_404",
+      prNumber: 99,
+    });
   });
 
   it("poll_error on non-404 rejection (watch keeps running in provider)", () => {
@@ -81,7 +100,9 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
 
   it("stops when a PR is closed without merge", () => {
     const target = [5] as const;
-    const settled = [fulfilled(mkPull({ number: 5, merged_at: null, state: "closed" }))];
+    const settled = [
+      fulfilled(mkPull({ number: 5, merged_at: null, state: "closed" })),
+    ];
     expect(phaseFromSettledPulls(target, settled)).toEqual({
       kind: "stop_closed",
       prNumbers: [5],
@@ -101,7 +122,10 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
   });
 
   it("returns poll_error when settled length mismatches targets", () => {
-    const phase = phaseFromSettledPulls([1, 2], [fulfilled(mkPull({ number: 1 }))]);
+    const phase = phaseFromSettledPulls(
+      [1, 2],
+      [fulfilled(mkPull({ number: 1 }))]
+    );
     expect(phase).toMatchObject({
       kind: "poll_error",
       message: expect.stringContaining("mismatch"),
@@ -114,7 +138,10 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
       fulfilled(mkPull({ number: 10, merged_at: null, state: "open" })),
       rejected(new GitHubError("gone", 404)),
     ];
-    expect(phaseFromSettledPulls(target, settled)).toEqual({ kind: "stop_404", prNumber: 20 });
+    expect(phaseFromSettledPulls(target, settled)).toEqual({
+      kind: "stop_404",
+      prNumber: 20,
+    });
   });
 
   it("poll_error for GitHubError with non-404 status", () => {
@@ -126,7 +153,11 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
   });
 
   it("all_merged when merged_at is set even if state is still open (API oddity)", () => {
-    const settled = [fulfilled(mkPull({ number: 1, merged_at: "2024-01-01T00:00:00Z", state: "open" }))];
+    const settled = [
+      fulfilled(
+        mkPull({ number: 1, merged_at: "2024-01-01T00:00:00Z", state: "open" })
+      ),
+    ];
     expect(phaseFromSettledPulls([1], settled)).toEqual({ kind: "all_merged" });
   });
 });

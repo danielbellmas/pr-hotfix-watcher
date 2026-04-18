@@ -26,10 +26,13 @@ export function tokenFromGhCli(executable: string = "gh"): string | undefined {
 }
 
 export async function resolveGitHubToken(
-  context: vscode.ExtensionContext,
+  context: vscode.ExtensionContext
 ): Promise<string | undefined> {
   const ghExecutable =
-    vscode.workspace.getConfiguration("fordefiHotfix").get<string>("ghPath", "")?.trim() || "gh";
+    vscode.workspace
+      .getConfiguration("fordefiHotfix")
+      .get<string>("ghPath", "")
+      ?.trim() || "gh";
   const fromGh = tokenFromGhCli(ghExecutable);
   if (fromGh) {
     return fromGh;
@@ -38,7 +41,9 @@ export async function resolveGitHubToken(
   if (fromSecret?.trim()) {
     return fromSecret.trim();
   }
-  const cfgPat = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("githubPat");
+  const cfgPat = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<string>("githubPat");
   if (cfgPat?.trim()) {
     return cfgPat.trim();
   }
@@ -51,12 +56,14 @@ export async function resolveGitHubToken(
 
 export async function storeGitHubToken(
   context: vscode.ExtensionContext,
-  token: string,
+  token: string
 ): Promise<void> {
   await context.secrets.store(SECRET_KEY, token.trim());
 }
 
-export async function clearStoredGithubToken(context: vscode.ExtensionContext): Promise<void> {
+export async function clearStoredGithubToken(
+  context: vscode.ExtensionContext
+): Promise<void> {
   await context.secrets.delete(SECRET_KEY);
 }
 
@@ -69,16 +76,23 @@ export function getRepoConfig(): { owner: string; repo: string } {
 }
 
 export function getRecentPrCount(): number {
-  return vscode.workspace.getConfiguration("fordefiHotfix").get<number>("recentPrCount", 20);
+  return vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<number>("recentPrCount", 20);
 }
 
 export function getPollIntervalMs(): number {
-  const sec = vscode.workspace.getConfiguration("fordefiHotfix").get<number>("pollIntervalSeconds", 60);
+  const sec = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<number>("pollIntervalSeconds", 60);
   return Math.max(5, sec) * 1000;
 }
 
 export function getRepoRoot(): string {
-  const configured = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("repoRoot", "")?.trim();
+  const configured = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<string>("repoRoot", "")
+    ?.trim();
   if (configured) {
     return configured;
   }
@@ -91,7 +105,7 @@ export function getCommandTemplate(): string {
     .getConfiguration("fordefiHotfix")
     .get<string>(
       "commandTemplate",
-      "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
+      "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}"
     )
     .trim();
 }
@@ -103,31 +117,51 @@ export function getHotfixCliOptionsFromConfig(): HotfixCliOptions {
   return {
     env,
     draft: Boolean(c.get<boolean>("hotfixDraft", false)),
-    criticalFastTrack: Boolean(c.get<boolean>("hotfixCriticalFastTrack", false)),
+    criticalFastTrack: Boolean(
+      c.get<boolean>("hotfixCriticalFastTrack", false)
+    ),
   };
 }
 
-export function buildHotfixCommand(prNumbers: number[], hotfixCli: HotfixCliOptions): string {
+export function buildHotfixCommand(
+  prNumbers: number[],
+  hotfixCli: HotfixCliOptions
+): string {
   const { owner, repo } = getRepoConfig();
   const repoRoot = getRepoRoot();
   const template = getCommandTemplate();
   const hotfixSuffix = buildHotfixCliSuffix(hotfixCli);
-  return expandHotfixCommandTemplate(template, { repoRoot, owner, repo, prNumbers, hotfixSuffix });
+  return expandHotfixCommandTemplate(template, {
+    repoRoot,
+    owner,
+    repo,
+    prNumbers,
+    hotfixSuffix,
+  });
 }
 
 /** Integrated terminal only: best-effort first prompt (no fcli `--yes` required). */
 export function getHotfixTerminalAutoFirstConfirm(): boolean {
-  return Boolean(vscode.workspace.getConfiguration("fordefiHotfix").get<boolean>("hotfixTerminalAutoFirstConfirm", true));
+  return Boolean(
+    vscode.workspace
+      .getConfiguration("fordefiHotfix")
+      .get<boolean>("hotfixTerminalAutoFirstConfirm", true)
+  );
 }
 
 export function getHotfixTerminalAutoFirstConfirmText(): string {
-  const raw = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("hotfixTerminalAutoFirstConfirmText", "y") ?? "y";
+  const raw =
+    vscode.workspace
+      .getConfiguration("fordefiHotfix")
+      .get<string>("hotfixTerminalAutoFirstConfirmText", "y") ?? "y";
   const t = raw.trim();
   return t.length > 0 ? t : "y";
 }
 
 export function getHotfixTerminalAutoFirstConfirmDelayMs(): number {
-  const n = vscode.workspace.getConfiguration("fordefiHotfix").get<number>("hotfixTerminalAutoFirstConfirmDelayMs", 600);
+  const n = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<number>("hotfixTerminalAutoFirstConfirmDelayMs", 600);
   const v = typeof n === "number" && Number.isFinite(n) ? n : 600;
   return Math.min(30_000, Math.max(100, Math.round(v)));
 }
@@ -135,11 +169,16 @@ export function getHotfixTerminalAutoFirstConfirmDelayMs(): number {
 export type { HotfixRunMode };
 
 export function getHotfixRunMode(): HotfixRunMode {
-  const raw = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("hotfixRunMode", "integratedTerminal");
+  const raw = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<string>("hotfixRunMode", "integratedTerminal");
   return parseHotfixRunMode(raw);
 }
 
 export function getHotfixTerminalName(): string {
-  const name = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("hotfixTerminalName", "Hotfix CLI")?.trim();
+  const name = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<string>("hotfixTerminalName", "Hotfix CLI")
+    ?.trim();
   return name || "Hotfix CLI";
 }
