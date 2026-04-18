@@ -2,6 +2,7 @@ import * as cp from "node:child_process";
 import * as vscode from "vscode";
 import { buildHotfixCliSuffix, type HotfixCliOptions } from "./hotfixCli";
 import { expandHotfixCommandTemplate } from "./hotfixCommandTemplate";
+import { parseHotfixRunMode, type HotfixRunMode } from "./hotfixRunHelpers";
 
 const SECRET_KEY = "fordefiHotfix.githubPat";
 
@@ -112,4 +113,16 @@ export function buildHotfixCommand(prNumbers: number[], hotfixCli: HotfixCliOpti
   const template = getCommandTemplate();
   const hotfixSuffix = buildHotfixCliSuffix(hotfixCli);
   return expandHotfixCommandTemplate(template, { repoRoot, owner, repo, prNumbers, hotfixSuffix });
+}
+
+export type { HotfixRunMode };
+
+export function getHotfixRunMode(): HotfixRunMode {
+  const raw = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("hotfixRunMode", "integratedTerminal");
+  return parseHotfixRunMode(raw);
+}
+
+export function getHotfixTerminalName(): string {
+  const name = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("hotfixTerminalName", "Hotfix CLI")?.trim();
+  return name || "Hotfix CLI";
 }

@@ -11,7 +11,7 @@
     "url": "https://github.com/arnac-io/arnac"
   },
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
     "Other"
@@ -139,9 +139,24 @@
           "default": "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
           "description": "Shell command after all selected PRs merge. Must include {prNumbers}. Placeholders: {repoRoot}, {prNumbers}, {prList}, {owner}, {repo}, {hotfixSuffix} (from Hotfix CLI row / settings)."
         },
+        "fordefiHotfix.hotfixRunMode": {
+          "type": "string",
+          "enum": ["integratedTerminal", "background"],
+          "default": "integratedTerminal",
+          "description": "How to run the hotfix command after merges. **integratedTerminal** — real terminal so you can touch a YubiKey and answer prompts (e.g. press y); success/failure toasts use shell integration when available. **background** — run via extension host (no TTY); good only for fully non-interactive scripts."
+        },
+        "fordefiHotfix.hotfixTerminalName": {
+          "type": "string",
+          "default": "Hotfix CLI",
+          "description": "Integrated terminal tab name when **Hotfix: Run mode** is `integratedTerminal`."
+        },
         "fordefiHotfix.hotfixEnv": {
           "type": "string",
-          "enum": ["pre", "prod", "both"],
+          "enum": [
+            "pre",
+            "prod",
+            "both"
+          ],
           "default": "pre",
           "description": "Default `--env` for `./fcli workflows hotfix create-pull-request`. Use **both** for `--env pre --env prod` (fcli accepts repeated `-e`)."
         },
@@ -179,7 +194,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.94.0",
     "@vscode/vsce": "^3.2.0",
     "typescript": "^5.4.0",
     "vitest": "^3.1.4"

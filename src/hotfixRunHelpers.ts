@@ -1,3 +1,9 @@
+export type HotfixRunMode = "integratedTerminal" | "background";
+
+export function parseHotfixRunMode(raw: string | undefined): HotfixRunMode {
+  return raw === "background" ? "background" : "integratedTerminal";
+}
+
 /** Last segment of text for short error toasts (single line-ish). */
 export function truncateRunLogTail(s: string, maxChars: number): string {
   const t = s.replace(/\r\n/g, "\n").trim();
