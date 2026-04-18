@@ -1,0 +1,186 @@
+{
+  "name": "hotfix-watcher",
+  "displayName": "Fordefi Hotfix Watcher",
+  "description": "Watch selected GitHub PRs until merged, then run a configurable hotfix CLI command.",
+  "version": "0.1.0",
+  "publisher": "fordefi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arnac-io/arnac"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:fordefiHotfix.prList"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "fordefiHotfix",
+          "title": "Hotfix",
+          "icon": "media/hotfix.svg"
+        }
+      ]
+    },
+    "views": {
+      "fordefiHotfix": [
+        {
+          "type": "webview",
+          "id": "fordefiHotfix.prList",
+          "name": "PR watch",
+          "contextualTitle": "Hotfix PRs"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "fordefiHotfix.setToken",
+        "title": "Hotfix: Set GitHub token"
+      },
+      {
+        "command": "fordefiHotfix.clearStoredToken",
+        "title": "Hotfix: Clear stored GitHub token (use gh CLI again)"
+      },
+      {
+        "command": "fordefiHotfix.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "fordefiHotfix.startWatch",
+        "title": "Start watching",
+        "icon": "$(run)"
+      },
+      {
+        "command": "fordefiHotfix.stopWatch",
+        "title": "Stop watching",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "fordefiHotfix.syncRepoFromGit",
+        "title": "Hotfix: Set owner/repo from git remote"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "fordefiHotfix.refresh",
+          "when": "view == fordefiHotfix.prList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "fordefiHotfix.startWatch",
+          "when": "view == fordefiHotfix.prList",
+          "group": "navigation@2"
+        },
+        {
+          "command": "fordefiHotfix.stopWatch",
+          "when": "view == fordefiHotfix.prList",
+          "group": "navigation@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "fordefiHotfix.setToken",
+          "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.clearStoredToken",
+          "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.syncRepoFromGit",
+          "when": "true"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Fordefi Hotfix",
+      "properties": {
+        "fordefiHotfix.owner": {
+          "type": "string",
+          "default": "arnac-io",
+          "description": "GitHub repository owner for PR search and API."
+        },
+        "fordefiHotfix.repo": {
+          "type": "string",
+          "default": "arnac",
+          "description": "GitHub repository name."
+        },
+        "fordefiHotfix.recentPrCount": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "How many of your most recently updated PRs to show."
+        },
+        "fordefiHotfix.pollIntervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "maximum": 3600,
+          "description": "Seconds between merge checks while watching."
+        },
+        "fordefiHotfix.repoRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the git clone where ./fcli lives. Empty uses the first workspace folder."
+        },
+        "fordefiHotfix.commandTemplate": {
+          "type": "string",
+          "default": "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
+          "description": "Shell command after all selected PRs merge. Must include {prNumbers}. Placeholders: {repoRoot}, {prNumbers}, {prList}, {owner}, {repo}, {hotfixSuffix} (from Hotfix CLI row / settings)."
+        },
+        "fordefiHotfix.hotfixEnv": {
+          "type": "string",
+          "enum": ["pre", "prod", "both"],
+          "default": "pre",
+          "description": "Default `--env` for `./fcli workflows hotfix create-pull-request`. Use **both** for `--env pre --env prod` (fcli accepts repeated `-e`)."
+        },
+        "fordefiHotfix.hotfixDraft": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default: pass `--draft` for a draft hotfix PR (fcli default is --no-draft)."
+        },
+        "fordefiHotfix.hotfixCriticalFastTrack": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default: pass `--critical-fast-track` (skip E2E in CI per fcli help)."
+        },
+        "fordefiHotfix.githubPat": {
+          "type": "string",
+          "default": "",
+          "description": "Optional PAT override only if `gh auth token` is unavailable. Prefer `gh auth login`."
+        },
+        "fordefiHotfix.ghPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the `gh` executable (e.g. /opt/homebrew/bin/gh). Empty searches PATH — required on macOS if VS Code was not started from a shell."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run verify",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run compile && npm run test",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.4.0",
+    "vitest": "^3.1.4"
+  }
+}
