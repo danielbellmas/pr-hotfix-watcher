@@ -53,6 +53,19 @@ export type WatchPanelState = {
   hotfixSummary: string;
 };
 
+export type RefreshOptions = {
+  /**
+   * When `false`, keep showing the current list (no full-list loader) until this fetch finishes.
+   * Use for refocus / visibility background refresh.
+   */
+  showListLoading?: boolean;
+  /**
+   * When `false`, keep the search box and remote search debounce state.
+   * Use together with `showListLoading: false` for view refocus.
+   */
+  resetSearch?: boolean;
+};
+
 export type HotfixPrViewState = {
   rows: PrRow[];
   selected: number[];
@@ -95,6 +108,8 @@ export class PrTreeProvider {
   private remoteDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   private listLoading = false;
+  /** After the first `refresh()` run finishes (any outcome), visibility refetch skips the list loader. */
+  private initialListFetchDone = false;
 
   private hotfixCli!: HotfixCliOptions;
   private prListView!: PrListViewOptions;
@@ -124,6 +139,11 @@ export class PrTreeProvider {
 
   getSelectedNumbers(): number[] {
     return [...this.selected].sort((a, b) => a - b);
+  }
+
+  /** Used by the webview: first open shows the list loader; later refocus uses a silent background refetch. */
+  hasCompletedInitialListFetch(): boolean {
+    return this.initialListFetchDone;
   }
 
   fireChange(): void {
@@ -316,10 +336,16 @@ export class PrTreeProvider {
     this._onDidChangeTreeData.fire();
   }
 
-  async refresh(): Promise<void> {
-    this.resetSearchState();
-    this.listLoading = true;
-    this._onDidChangeTreeData.fire();
+  async refresh(options?: RefreshOptions): Promise<void> {
+    const showListLoading = options?.showListLoading !== false;
+    const resetSearch = options?.resetSearch !== false;
+    if (resetSearch) {
+      this.resetSearchState();
+    }
+    if (showListLoading) {
+      this.listLoading = true;
+      this._onDidChangeTreeData.fire();
+    }
     try {
       const token = await resolveGitHubToken(this.context);
       if (!token) {
@@ -378,10 +404,13 @@ export class PrTreeProvider {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.loadError = msg;
-        vscode.window.showErrorMessage(`Hotfix watcher: ${msg}`);
+        if (showListLoading) {
+          vscode.window.showErrorMessage(`Hotfix watcher: ${msg}`);
+        }
       }
     } finally {
       this.listLoading = false;
+      this.initialListFetchDone = true;
       this._onDidChangeTreeData.fire();
     }
   }

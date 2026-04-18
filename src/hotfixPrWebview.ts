@@ -103,7 +103,11 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
     });
     const fetchPrsIfVisible = (): void => {
       if (webviewView.visible) {
-        void this.prs.refresh();
+        if (this.prs.hasCompletedInitialListFetch()) {
+          void this.prs.refresh({ showListLoading: false, resetSearch: false });
+        } else {
+          void this.prs.refresh();
+        }
       }
     };
     webviewView.onDidChangeVisibility(fetchPrsIfVisible);
