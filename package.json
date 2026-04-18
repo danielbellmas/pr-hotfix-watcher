@@ -170,6 +170,23 @@
           "default": false,
           "description": "Default: pass `--critical-fast-track` (skip E2E in CI per fcli help)."
         },
+        "fordefiHotfix.hotfixTerminalAutoFirstConfirm": {
+          "type": "boolean",
+          "default": true,
+          "description": "Integrated terminal only: after the hotfix command starts (shell integration), send **Hotfix: Auto first confirm text** once after the delay. Use this when fcli has no `--yes` but still asks for the first `y` / confirmation; YubiKey prompts per environment are unchanged. Best-effort — turn off if it double-submits or fires too early."
+        },
+        "fordefiHotfix.hotfixTerminalAutoFirstConfirmText": {
+          "type": "string",
+          "default": "y",
+          "description": "Keystrokes sent for the first prompt (e.g. `y` or `yes`). If the value has no line breaks, Enter is appended automatically."
+        },
+        "fordefiHotfix.hotfixTerminalAutoFirstConfirmDelayMs": {
+          "type": "number",
+          "default": 600,
+          "minimum": 100,
+          "maximum": 30000,
+          "description": "Wait this many milliseconds after the command starts before sending **Hotfix: Auto first confirm text**. Increase if the prompt appears late."
+        },
         "fordefiHotfix.githubPat": {
           "type": "string",
           "default": "",

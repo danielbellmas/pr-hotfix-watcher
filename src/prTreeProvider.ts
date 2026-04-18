@@ -17,7 +17,11 @@ import {
   getRepoRoot,
   resolveGitHubToken,
 } from "./config";
-import { buildHotfixCliSuffix, normalizeHotfixCliOptions, type HotfixCliOptions } from "./hotfixCli";
+import {
+  buildHotfixCliSuffix,
+  normalizeHotfixCliOptions,
+  type HotfixCliOptions,
+} from "./hotfixCli";
 import { runHotfixShellCommandAfterMerge } from "./hotfixRun";
 import {
   applyPrViewFilterSort,
@@ -86,7 +90,9 @@ export type HotfixPrViewState = {
 };
 
 export class PrTreeProvider {
-  private _onDidChangeTreeData = new vscode.EventEmitter<PrRow | undefined | void>();
+  private _onDidChangeTreeData = new vscode.EventEmitter<
+    PrRow | undefined | void
+  >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private rows: PrRow[] = [];
@@ -115,9 +121,16 @@ export class PrTreeProvider {
   private prListView!: PrListViewOptions;
 
   constructor(private readonly context: vscode.ExtensionContext) {
-    const saved = this.context.workspaceState.get<Partial<HotfixCliOptions>>("fordefiHotfix.hotfixCliView");
-    this.hotfixCli = normalizeHotfixCliOptions(saved ?? undefined, getHotfixCliOptionsFromConfig());
-    const savedList = this.context.workspaceState.get<Partial<PrListViewOptions>>("fordefiHotfix.prListView");
+    const saved = this.context.workspaceState.get<Partial<HotfixCliOptions>>(
+      "fordefiHotfix.hotfixCliView"
+    );
+    this.hotfixCli = normalizeHotfixCliOptions(
+      saved ?? undefined,
+      getHotfixCliOptionsFromConfig()
+    );
+    const savedList = this.context.workspaceState.get<
+      Partial<PrListViewOptions>
+    >("fordefiHotfix.prListView");
     this.prListView = normalizePrListViewOptions(savedList ?? undefined);
   }
 
@@ -202,14 +215,24 @@ export class PrTreeProvider {
 
   setHotfixCliOptions(partial: Partial<HotfixCliOptions>): void {
     const merged = { ...this.hotfixCli, ...partial };
-    this.hotfixCli = normalizeHotfixCliOptions(merged, getHotfixCliOptionsFromConfig());
-    void this.context.workspaceState.update("fordefiHotfix.hotfixCliView", { ...this.hotfixCli });
+    this.hotfixCli = normalizeHotfixCliOptions(
+      merged,
+      getHotfixCliOptionsFromConfig()
+    );
+    void this.context.workspaceState.update("fordefiHotfix.hotfixCliView", {
+      ...this.hotfixCli,
+    });
     this._onDidChangeTreeData.fire();
   }
 
   setPrListViewOptions(partial: Partial<PrListViewOptions>): void {
-    this.prListView = normalizePrListViewOptions({ ...this.prListView, ...partial });
-    void this.context.workspaceState.update("fordefiHotfix.prListView", { ...this.prListView });
+    this.prListView = normalizePrListViewOptions({
+      ...this.prListView,
+      ...partial,
+    });
+    void this.context.workspaceState.update("fordefiHotfix.prListView", {
+      ...this.prListView,
+    });
     this._onDidChangeTreeData.fire();
   }
 
@@ -279,8 +302,18 @@ export class PrTreeProvider {
   }
 
   private buildDisplayRows(): PrRow[] {
-    const merged = buildDisplayPrRows(this.rows, this.remoteRows, this.searchQuery, this.selected);
-    return applyPrViewFilterSort(merged, this.prListView.statusFilter, this.prListView.sortMode, this.selected);
+    const merged = buildDisplayPrRows(
+      this.rows,
+      this.remoteRows,
+      this.searchQuery,
+      this.selected
+    );
+    return applyPrViewFilterSort(
+      merged,
+      this.prListView.statusFilter,
+      this.prListView.sortMode,
+      this.selected
+    );
   }
 
   private async runRepoSearch(trimmed: string, gen: number): Promise<void> {
@@ -295,11 +328,19 @@ export class PrTreeProvider {
         return;
       }
       const { owner, repo } = getRepoConfig();
-      const items = await searchRepoPullRequests(token, owner, repo, trimmed, 30);
+      const items = await searchRepoPullRequests(
+        token,
+        owner,
+        repo,
+        trimmed,
+        30
+      );
       if (gen !== this.remoteSearchGen || trimmed !== this.searchQuery.trim()) {
         return;
       }
-      this.remoteRows = items.map((it) => this.rowFromSearchItem(it)).filter((row) => row.state === "open" || row.mergedAt);
+      this.remoteRows = items
+        .map((it) => this.rowFromSearchItem(it))
+        .filter((row) => row.state === "open" || row.mergedAt);
       this.searchRemoteError = null;
     } catch (e) {
       if (gen !== this.remoteSearchGen || trimmed !== this.searchQuery.trim()) {
@@ -349,7 +390,8 @@ export class PrTreeProvider {
     try {
       const token = await resolveGitHubToken(this.context);
       if (!token) {
-        this.loadError = "No GitHub token. Run command “Hotfix: Set GitHub token”.";
+        this.loadError =
+          "No GitHub token. Run command “Hotfix: Set GitHub token”.";
         this.rows = [];
         return;
       }
@@ -358,7 +400,13 @@ export class PrTreeProvider {
       const limit = getRecentPrCount();
       try {
         this.login = await getAuthenticatedLogin(token);
-        const searchItems = await searchAuthorPullRequests(token, owner, repo, this.login, limit);
+        const searchItems = await searchAuthorPullRequests(
+          token,
+          owner,
+          repo,
+          this.login,
+          limit
+        );
         const orderedNumbers: number[] = [];
         const seen = new Set<number>();
         for (const it of searchItems) {
@@ -378,7 +426,7 @@ export class PrTreeProvider {
               }
               throw e;
             }
-          }),
+          })
         );
         const nextRows: PrRow[] = [];
         for (let i = 0; i < numbers.length; i++) {
@@ -422,7 +470,9 @@ export class PrTreeProvider {
     }
     const nums = this.getSelectedNumbers();
     if (nums.length === 0) {
-      void vscode.window.showWarningMessage("Select at least one PR (checkbox) to watch.");
+      void vscode.window.showWarningMessage(
+        "Select at least one PR (checkbox) to watch."
+      );
       return;
     }
     try {
@@ -446,7 +496,10 @@ export class PrTreeProvider {
     this.statusMessage = `Waiting on #${nums.join(", #")}…`;
     this._onDidChangeTreeData.fire();
     void this.pollOnce();
-    this.pollTimer = setInterval(() => void this.pollOnce(), getPollIntervalMs());
+    this.pollTimer = setInterval(
+      () => void this.pollOnce(),
+      getPollIntervalMs()
+    );
   }
 
   stopWatch(): void {
@@ -468,16 +521,22 @@ export class PrTreeProvider {
     const token = await resolveGitHubToken(this.context);
     if (!token) {
       this.stopWatch();
-      void vscode.window.showErrorMessage("GitHub token missing; stopped watch.");
+      void vscode.window.showErrorMessage(
+        "GitHub token missing; stopped watch."
+      );
       return;
     }
     const { owner, repo } = getRepoConfig();
     try {
       const settled = await Promise.allSettled(
-        this.watchTarget.map((n) => getPullRequest(token, owner, repo, n)),
+        this.watchTarget.map((n) => getPullRequest(token, owner, repo, n))
       );
       const allFulfilled = settled.every(
-        (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof getPullRequest>>> => r.status === "fulfilled",
+        (
+          r
+        ): r is PromiseFulfilledResult<
+          Awaited<ReturnType<typeof getPullRequest>>
+        > => r.status === "fulfilled"
       );
       if (allFulfilled) {
         this.watchEntries = settled.map((r, i) => {
@@ -493,18 +552,22 @@ export class PrTreeProvider {
       const phase = phaseFromSettledPulls(this.watchTarget, settled);
       if (phase.kind === "stop_404") {
         this.stopWatch();
-        void vscode.window.showErrorMessage(`Hotfix watch stopped: PR #${phase.prNumber} was not found.`);
+        void vscode.window.showErrorMessage(
+          `Hotfix watch stopped: PR #${phase.prNumber} was not found.`
+        );
         return;
       }
       if (phase.kind === "poll_error") {
-        void vscode.window.showErrorMessage(`Hotfix watch poll failed: ${phase.message}`);
+        void vscode.window.showErrorMessage(
+          `Hotfix watch poll failed: ${phase.message}`
+        );
         return;
       }
       if (phase.kind === "stop_closed") {
         this.stopWatch();
         const nums = phase.prNumbers.join(", #");
         void vscode.window.showWarningMessage(
-          `Hotfix watch stopped: PR #${nums} closed without merging.`,
+          `Hotfix watch stopped: PR #${nums} closed without merging.`
         );
         return;
       }
@@ -519,14 +582,20 @@ export class PrTreeProvider {
       const cwd = getRepoRoot();
       if (!cwd) {
         void vscode.window.showErrorMessage(
-          "fordefiHotfix.repoRoot is empty and no workspace folder — set repo root in settings.",
+          "fordefiHotfix.repoRoot is empty and no workspace folder — set repo root in settings."
         );
         return;
       }
       void vscode.window.showInformationMessage(
-        `All PRs merged. Running hotfix command for ${mergedNumbers.map((n) => `#${n}`).join(", ")}…`,
+        `All PRs merged. Running hotfix command for ${mergedNumbers
+          .map((n) => `#${n}`)
+          .join(", ")}…`
       );
-      await runHotfixShellCommandAfterMerge({ command: cmd, cwd, prNumbers: mergedNumbers });
+      await runHotfixShellCommandAfterMerge({
+        command: cmd,
+        cwd,
+        prNumbers: mergedNumbers,
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       void vscode.window.showErrorMessage(`Hotfix watch poll failed: ${msg}`);

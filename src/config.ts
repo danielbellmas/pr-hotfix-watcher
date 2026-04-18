@@ -115,6 +115,23 @@ export function buildHotfixCommand(prNumbers: number[], hotfixCli: HotfixCliOpti
   return expandHotfixCommandTemplate(template, { repoRoot, owner, repo, prNumbers, hotfixSuffix });
 }
 
+/** Integrated terminal only: best-effort first prompt (no fcli `--yes` required). */
+export function getHotfixTerminalAutoFirstConfirm(): boolean {
+  return Boolean(vscode.workspace.getConfiguration("fordefiHotfix").get<boolean>("hotfixTerminalAutoFirstConfirm", true));
+}
+
+export function getHotfixTerminalAutoFirstConfirmText(): string {
+  const raw = vscode.workspace.getConfiguration("fordefiHotfix").get<string>("hotfixTerminalAutoFirstConfirmText", "y") ?? "y";
+  const t = raw.trim();
+  return t.length > 0 ? t : "y";
+}
+
+export function getHotfixTerminalAutoFirstConfirmDelayMs(): number {
+  const n = vscode.workspace.getConfiguration("fordefiHotfix").get<number>("hotfixTerminalAutoFirstConfirmDelayMs", 600);
+  const v = typeof n === "number" && Number.isFinite(n) ? n : 600;
+  return Math.min(30_000, Math.max(100, Math.round(v)));
+}
+
 export type { HotfixRunMode };
 
 export function getHotfixRunMode(): HotfixRunMode {

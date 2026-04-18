@@ -1,6 +1,12 @@
 import * as cp from "node:child_process";
 import * as vscode from "vscode";
-import { getHotfixRunMode, getHotfixTerminalName } from "./config";
+import {
+  getHotfixRunMode,
+  getHotfixTerminalAutoFirstConfirm,
+  getHotfixTerminalAutoFirstConfirmDelayMs,
+  getHotfixTerminalAutoFirstConfirmText,
+  getHotfixTerminalName,
+} from "./config";
 import { formatPrLabels, truncateRunLogTail } from "./hotfixRunHelpers";
 
 const OUTPUT_TITLE = "Fordefi Hotfix CLI";
@@ -138,12 +144,17 @@ async function runHotfixIntegratedTerminal(command: string, cwd: string, prs: st
     let activeExecution: vscode.TerminalShellExecution | undefined;
     let settled = false;
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+    let autoFirstConfirmTimer: ReturnType<typeof setTimeout> | undefined;
     const disposables: vscode.Disposable[] = [];
 
     const cleanup = (): void => {
       if (fallbackTimer !== undefined) {
         clearTimeout(fallbackTimer);
         fallbackTimer = undefined;
+      }
+      if (autoFirstConfirmTimer !== undefined) {
+        clearTimeout(autoFirstConfirmTimer);
+        autoFirstConfirmTimer = undefined;
       }
       for (const d of disposables) {
         d.dispose();
@@ -159,6 +170,31 @@ async function runHotfixIntegratedTerminal(command: string, cwd: string, prs: st
       resolve();
     };
 
+    const scheduleAutoFirstConfirm = (): void => {
+      if (!getHotfixTerminalAutoFirstConfirm()) {
+        return;
+      }
+      const delay = getHotfixTerminalAutoFirstConfirmDelayMs();
+      const text = getHotfixTerminalAutoFirstConfirmText();
+      if (autoFirstConfirmTimer !== undefined) {
+        clearTimeout(autoFirstConfirmTimer);
+      }
+      autoFirstConfirmTimer = setTimeout(() => {
+        autoFirstConfirmTimer = undefined;
+        if (settled) {
+          return;
+        }
+        const addNewline = !/[\r\n]/.test(text);
+        ch.appendLine(`[auto-confirm] sending first-prompt input after ${delay}ms`);
+        try {
+          terminal.sendText(text, addNewline);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          ch.appendLine(`[auto-confirm] ${msg}`);
+        }
+      }, delay);
+    };
+
     const tryExecute = (si: vscode.TerminalShellIntegration | undefined): boolean => {
       if (activeExecution || !si) {
         return false;
@@ -169,6 +205,7 @@ async function runHotfixIntegratedTerminal(command: string, cwd: string, prs: st
           clearTimeout(fallbackTimer);
           fallbackTimer = undefined;
         }
+        scheduleAutoFirstConfirm();
         return true;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
