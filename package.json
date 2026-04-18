@@ -4,6 +4,7 @@
   "description": "Watch selected GitHub PRs until merged, then run a configurable hotfix CLI command.",
   "version": "0.1.0",
   "publisher": "fordefi",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
