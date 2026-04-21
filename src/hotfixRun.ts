@@ -7,7 +7,11 @@ import {
   getHotfixTerminalAutoFirstConfirmText,
   getHotfixTerminalName,
 } from "./config";
-import { formatPrLabels, truncateRunLogTail } from "./hotfixRunHelpers";
+import {
+  formatPrLabels,
+  parseHotfixPrUrl,
+  truncateRunLogTail,
+} from "./hotfixRunHelpers";
 
 const OUTPUT_TITLE = "Fordefi Hotfix CLI";
 
@@ -125,13 +129,21 @@ function notifyTerminalEnd(
   }
 }
 
+type HotfixRunResult = {
+  /** Exit 0 for spawn mode; shell-integration exit 0 for terminal mode; undefined when unknown. */
+  exitCode: number | undefined;
+  /** Whatever we captured from stdout/stderr (already tail-bounded). */
+  output: string;
+};
+
 async function runHotfixSpawnBackground(
   command: string,
   cwd: string,
   prs: string,
   ch: vscode.OutputChannel
-): Promise<void> {
+): Promise<HotfixRunResult> {
   let combined = "";
+  let resolvedExit: number | undefined;
   await new Promise<void>((resolve) => {
     const child = cp.spawn(command, {
       shell: true,
@@ -159,9 +171,11 @@ async function runHotfixSpawnBackground(
 
     child.on("close", (code, signal) => {
       notifySpawnClose(prs, code, signal, combined, ch);
+      resolvedExit = typeof code === "number" ? code : undefined;
       resolve();
     });
   });
+  return { exitCode: resolvedExit, output: combined };
 }
 
 async function runHotfixIntegratedTerminal(
@@ -169,10 +183,13 @@ async function runHotfixIntegratedTerminal(
   cwd: string,
   prs: string,
   ch: vscode.OutputChannel
-): Promise<void> {
+): Promise<HotfixRunResult> {
   const terminalName = getHotfixTerminalName();
   const terminal = vscode.window.createTerminal({ name: terminalName, cwd });
   terminal.show(true);
+
+  let capturedOutput = "";
+  let resolvedExit: number | undefined;
 
   await new Promise<void>((resolve) => {
     let activeExecution: vscode.TerminalShellExecution | undefined;
@@ -231,6 +248,27 @@ async function runHotfixIntegratedTerminal(
       }, delay);
     };
 
+    const consumeExecutionStream = async (
+      execution: vscode.TerminalShellExecution
+    ): Promise<void> => {
+      const maybeRead = (
+        execution as unknown as {
+          read?: () => AsyncIterable<string>;
+        }
+      ).read;
+      if (typeof maybeRead !== "function") {
+        return;
+      }
+      try {
+        for await (const chunk of maybeRead.call(execution)) {
+          capturedOutput = (capturedOutput + chunk).slice(-16000);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        ch.appendLine(`[stream read failed] ${msg}`);
+      }
+    };
+
     const tryExecute = (
       si: vscode.TerminalShellIntegration | undefined
     ): boolean => {
@@ -244,6 +282,7 @@ async function runHotfixIntegratedTerminal(
           fallbackTimer = undefined;
         }
         scheduleAutoFirstConfirm();
+        void consumeExecutionStream(activeExecution);
         return true;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -262,6 +301,7 @@ async function runHotfixIntegratedTerminal(
           e.exitCode === undefined ? "undefined" : String(e.exitCode)
         }`
       );
+      resolvedExit = e.exitCode;
       notifyTerminalEnd(prs, e.exitCode, ch);
       done();
     });
@@ -311,7 +351,20 @@ async function runHotfixIntegratedTerminal(
       );
     }, SHELL_INTEGRATION_WAIT_MS);
   });
+
+  return { exitCode: resolvedExit, output: capturedOutput };
 }
+
+export type HotfixShellRunResult = {
+  /** Exit code from the fcli process (0 when successful). undefined when the shell did not report one. */
+  exitCode: number | undefined;
+  /** True when we have positive confirmation the command finished successfully. */
+  ok: boolean;
+  /** Hotfix PR URL parsed from fcli output (e.g. `HOTFIX_PR_URL=...`). undefined when not emitted. */
+  hotfixPrUrl: string | undefined;
+  /** Captured command output (tail-bounded). May be empty when shell-integration read is unavailable. */
+  output: string;
+};
 
 /**
  * Runs the configured hotfix shell command after all watched PRs merged.
@@ -322,7 +375,7 @@ export async function runHotfixShellCommandAfterMerge(options: {
   command: string;
   cwd: string;
   prNumbers: readonly number[];
-}): Promise<void> {
+}): Promise<HotfixShellRunResult> {
   const { command, cwd, prNumbers } = options;
   const prs = formatPrLabels(prNumbers);
   const ch = getOutputChannel();
@@ -330,9 +383,16 @@ export async function runHotfixShellCommandAfterMerge(options: {
   ch.show(true);
 
   const mode = getHotfixRunMode();
-  if (mode === "background") {
-    await runHotfixSpawnBackground(command, cwd, prs, ch);
-  } else {
-    await runHotfixIntegratedTerminal(command, cwd, prs, ch);
-  }
+  const raw =
+    mode === "background"
+      ? await runHotfixSpawnBackground(command, cwd, prs, ch)
+      : await runHotfixIntegratedTerminal(command, cwd, prs, ch);
+
+  const hotfixPrUrl = parseHotfixPrUrl(raw.output);
+  return {
+    exitCode: raw.exitCode,
+    ok: raw.exitCode === 0,
+    hotfixPrUrl,
+    output: raw.output,
+  };
 }

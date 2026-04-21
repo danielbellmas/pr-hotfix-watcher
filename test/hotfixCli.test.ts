@@ -8,6 +8,7 @@ const defaults = {
   env: "pre" as const,
   draft: false,
   criticalFastTrack: false,
+  deploy: false,
 };
 
 describe("buildHotfixCliSuffix", () => {
@@ -18,6 +19,7 @@ describe("buildHotfixCliSuffix", () => {
         env: "prod",
         draft: false,
         criticalFastTrack: false,
+        deploy: false,
       })
     ).toBe("--env prod");
     expect(
@@ -25,6 +27,7 @@ describe("buildHotfixCliSuffix", () => {
         env: "both",
         draft: false,
         criticalFastTrack: false,
+        deploy: false,
       })
     ).toBe("--env pre --env prod");
   });
@@ -35,6 +38,7 @@ describe("buildHotfixCliSuffix", () => {
         env: "pre",
         draft: true,
         criticalFastTrack: false,
+        deploy: false,
       })
     ).toBe("--env pre --draft");
   });
@@ -45,6 +49,7 @@ describe("buildHotfixCliSuffix", () => {
         env: "pre",
         draft: false,
         criticalFastTrack: true,
+        deploy: false,
       })
     ).toBe("--env pre --critical-fast-track");
   });
@@ -55,6 +60,7 @@ describe("buildHotfixCliSuffix", () => {
         env: "prod",
         draft: true,
         criticalFastTrack: true,
+        deploy: false,
       })
     ).toBe("--env prod --draft --critical-fast-track");
     expect(
@@ -62,8 +68,28 @@ describe("buildHotfixCliSuffix", () => {
         env: "both",
         draft: true,
         criticalFastTrack: false,
+        deploy: false,
       })
     ).toBe("--env pre --env prod --draft");
+  });
+
+  it("does NOT include --deploy (deploy is an extension-side flag)", () => {
+    expect(
+      buildHotfixCliSuffix({
+        env: "pre",
+        draft: false,
+        criticalFastTrack: false,
+        deploy: true,
+      })
+    ).toBe("--env pre");
+    expect(
+      buildHotfixCliSuffix({
+        env: "both",
+        draft: true,
+        criticalFastTrack: true,
+        deploy: true,
+      })
+    ).toBe("--env pre --env prod --draft --critical-fast-track");
   });
 });
 
@@ -80,12 +106,28 @@ describe("normalizeHotfixCliOptions", () => {
       env: "prod",
       draft: true,
       criticalFastTrack: false,
+      deploy: false,
     });
     expect(normalizeHotfixCliOptions({ env: "both" }, defaults)).toEqual({
       env: "both",
       draft: false,
       criticalFastTrack: false,
+      deploy: false,
     });
+  });
+
+  it("normalizes deploy from persisted state", () => {
+    expect(normalizeHotfixCliOptions({ deploy: true }, defaults)).toEqual({
+      ...defaults,
+      deploy: true,
+    });
+    expect(
+      normalizeHotfixCliOptions(
+        // @ts-expect-error persisted garbage
+        { deploy: "yes" },
+        defaults
+      )
+    ).toEqual(defaults);
   });
 
   it("rejects invalid env", () => {

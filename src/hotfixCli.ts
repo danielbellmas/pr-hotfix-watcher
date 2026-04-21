@@ -4,6 +4,11 @@ export type HotfixCliOptions = {
   env: HotfixCliEnv;
   draft: boolean;
   criticalFastTrack: boolean;
+  /**
+   * Extension-side flag: after the fcli-created hotfix PR is merged, dispatch
+   * the matching arnac-io/workflows workflow(s). Not forwarded to fcli.
+   */
+  deploy: boolean;
 };
 
 /** `fcli workflows hotfix create-pull-request` flag segment (`--env`, optional `--draft`, `--critical-fast-track`). */
@@ -36,5 +41,7 @@ export function normalizeHotfixCliOptions(
       typeof partial?.criticalFastTrack === "boolean"
         ? partial.criticalFastTrack
         : defaults.criticalFastTrack,
+    deploy:
+      typeof partial?.deploy === "boolean" ? partial.deploy : defaults.deploy,
   };
 }

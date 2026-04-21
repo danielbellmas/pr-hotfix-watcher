@@ -4,6 +4,7 @@ import {
   getRepoRoot,
   storeGitHubToken,
 } from "./config";
+import { registerHotfixDeployOutputChannel } from "./deployRun";
 import { parseGitHubRepoFromRemote, readOriginRemote } from "./gitRemote";
 import { registerHotfixCliOutputChannel } from "./hotfixRun";
 import { HotfixPrWebviewProvider } from "./hotfixPrWebview";
@@ -11,6 +12,7 @@ import { PrTreeProvider } from "./prTreeProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
   registerHotfixCliOutputChannel(context);
+  registerHotfixDeployOutputChannel(context);
   const provider = new PrTreeProvider(context);
   const webviewProvider = new HotfixPrWebviewProvider(provider);
 

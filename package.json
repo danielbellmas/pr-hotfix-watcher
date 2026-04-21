@@ -170,6 +170,36 @@
           "default": false,
           "description": "Default: pass `--critical-fast-track` (skip E2E in CI per fcli help)."
         },
+        "fordefiHotfix.hotfixDeploy": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default value for the **deploy** checkbox. When on, after the fcli-created hotfix PR is merged the extension dispatches the matching workflow(s) in arnac-io/workflows (pre-hotfix.yml, production-hotfix.yml, or pre → wait for success → prod)."
+        },
+        "fordefiHotfix.workflowsOwner": {
+          "type": "string",
+          "default": "arnac-io",
+          "description": "Owner of the repository that hosts the hotfix GitHub Actions workflows."
+        },
+        "fordefiHotfix.workflowsRepo": {
+          "type": "string",
+          "default": "workflows",
+          "description": "Repository name that hosts the hotfix GitHub Actions workflows (dispatched via `gh workflow run`)."
+        },
+        "fordefiHotfix.preHotfixWorkflow": {
+          "type": "string",
+          "default": "pre-hotfix.yml",
+          "description": "Workflow file name for the pre-environment hotfix deploy."
+        },
+        "fordefiHotfix.productionHotfixWorkflow": {
+          "type": "string",
+          "default": "production-hotfix.yml",
+          "description": "Workflow file name for the production-environment hotfix deploy."
+        },
+        "fordefiHotfix.workflowRef": {
+          "type": "string",
+          "default": "main",
+          "description": "Git ref passed to `gh workflow run --ref` when dispatching hotfix workflows."
+        },
         "fordefiHotfix.hotfixTerminalAutoFirstConfirm": {
           "type": "boolean",
           "default": true,

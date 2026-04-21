@@ -12,6 +12,7 @@ type FromWebview =
       env?: string;
       draft?: boolean;
       criticalFastTrack?: boolean;
+      deploy?: boolean;
     }
   | { command: "prListView"; statusFilter?: string; sortMode?: string };
 
@@ -88,6 +89,7 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
           env?: "pre" | "prod" | "both";
           draft?: boolean;
           criticalFastTrack?: boolean;
+          deploy?: boolean;
         } = {};
         if (msg.env === "pre" || msg.env === "prod" || msg.env === "both") {
           p.env = msg.env;
@@ -97,6 +99,9 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
         }
         if (typeof msg.criticalFastTrack === "boolean") {
           p.criticalFastTrack = msg.criticalFastTrack;
+        }
+        if (typeof msg.deploy === "boolean") {
+          p.deploy = msg.deploy;
         }
         this.prs.setHotfixCliOptions(p);
         return;
@@ -510,10 +515,11 @@ function getHtml(
     }
     .cli-row {
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: center;
-      gap: 0;
+      column-gap: 0;
+      row-gap: 6px;
       font-size: calc(var(--vscode-font-size) - 1px);
       color: var(--vscode-descriptionForeground);
     }
@@ -522,6 +528,11 @@ function getHtml(
       user-select: none;
       opacity: 0.55;
       font-weight: 300;
+    }
+    /* Hide separator when it wraps to start of a new line (prevents orphan "|"). */
+    .cli-row > .cli-sep:first-child,
+    .cli-row > .cli-sep:last-child {
+      display: none;
     }
     .cli-select {
       min-width: 108px;
@@ -593,6 +604,11 @@ function getHtml(
         <input type="checkbox" id="hotfixFtCb" aria-label="critical fast track" />
         critical fast track
       </label>
+      <span class="cli-sep" aria-hidden="true">|</span>
+      <label class="cli-check" title="After the created hotfix PR is merged, dispatch the matching workflow(s) in arnac-io/workflows">
+        <input type="checkbox" id="hotfixDeployCb" aria-label="deploy" />
+        deploy
+      </label>
     </div>
   </div>
   <div class="cli-panel" id="filterPanel">
@@ -658,18 +674,21 @@ function getHtml(
     const envSel = document.getElementById("hotfixEnvSel");
     const draftCb = document.getElementById("hotfixDraftCb");
     const ftCb = document.getElementById("hotfixFtCb");
+    const deployCb = document.getElementById("hotfixDeployCb");
     function postHotfixCli() {
-      if (!envSel || !draftCb || !ftCb) return;
+      if (!envSel || !draftCb || !ftCb || !deployCb) return;
       vscode.postMessage({
         command: "hotfixCli",
         env: envSel.value,
         draft: draftCb.checked,
         criticalFastTrack: ftCb.checked,
+        deploy: deployCb.checked,
       });
     }
     if (envSel) envSel.addEventListener("change", postHotfixCli);
     if (draftCb) draftCb.addEventListener("change", postHotfixCli);
     if (ftCb) ftCb.addEventListener("change", postHotfixCli);
+    if (deployCb) deployCb.addEventListener("change", postHotfixCli);
 
     const statusSel = document.getElementById("prStatusFilterSel");
     const sortSel = document.getElementById("prSortSel");
@@ -704,7 +723,7 @@ function getHtml(
         }
         searchStatus.textContent = st;
       }
-      if (state.hotfixCli && envSel && draftCb && ftCb) {
+      if (state.hotfixCli && envSel && draftCb && ftCb && deployCb) {
         if (envSel.value !== state.hotfixCli.env) {
           envSel.value = state.hotfixCli.env;
         }
@@ -713,6 +732,9 @@ function getHtml(
         }
         if (ftCb.checked !== state.hotfixCli.criticalFastTrack) {
           ftCb.checked = state.hotfixCli.criticalFastTrack;
+        }
+        if (deployCb.checked !== Boolean(state.hotfixCli.deploy)) {
+          deployCb.checked = Boolean(state.hotfixCli.deploy);
         }
       }
       if (state.prListView && statusSel && sortSel) {

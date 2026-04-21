@@ -120,7 +120,36 @@ export function getHotfixCliOptionsFromConfig(): HotfixCliOptions {
     criticalFastTrack: Boolean(
       c.get<boolean>("hotfixCriticalFastTrack", false)
     ),
+    deploy: Boolean(c.get<boolean>("hotfixDeploy", false)),
   };
+}
+
+export type WorkflowsRepoConfig = {
+  owner: string;
+  repo: string;
+  preWorkflow: string;
+  prodWorkflow: string;
+  ref: string;
+};
+
+export function getWorkflowsRepoConfig(): WorkflowsRepoConfig {
+  const c = vscode.workspace.getConfiguration("fordefiHotfix");
+  return {
+    owner: c.get<string>("workflowsOwner", "arnac-io").trim() || "arnac-io",
+    repo: c.get<string>("workflowsRepo", "workflows").trim() || "workflows",
+    preWorkflow:
+      c.get<string>("preHotfixWorkflow", "pre-hotfix.yml").trim() ||
+      "pre-hotfix.yml",
+    prodWorkflow:
+      c.get<string>("productionHotfixWorkflow", "production-hotfix.yml").trim() ||
+      "production-hotfix.yml",
+    ref: c.get<string>("workflowRef", "main").trim() || "main",
+  };
+}
+
+/** Seconds between hotfix-PR merge checks during the deploy phase. Falls back to the main poll interval. */
+export function getHotfixPrPollIntervalMs(): number {
+  return getPollIntervalMs();
 }
 
 export function buildHotfixCommand(
