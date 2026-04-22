@@ -80,7 +80,7 @@
         },
         {
           "command": "fordefiHotfix.stopWatch",
-          "when": "view == fordefiHotfix.prList",
+          "when": "view == fordefiHotfix.prList && !fordefiHotfix.deployRunning",
           "group": "navigation@3"
         }
       ],

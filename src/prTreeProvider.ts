@@ -21,6 +21,10 @@ import {
 } from "./config";
 import { runHotfixDeploy } from "./deployRun";
 import {
+  orchestrateDeployAfterFcli,
+  type DeployOrchestratorResult,
+} from "./deployOrchestrator";
+import {
   buildHotfixCliSuffix,
   normalizeHotfixCliOptions,
   type HotfixCliOptions,
@@ -38,6 +42,7 @@ import {
 } from "./prListViewOptions";
 import { buildDisplayPrRows, filterPrRowsByQuery } from "./prSearch";
 import { phaseFromSettledPulls } from "./watchPoll";
+import { MergeHandoffGate } from "./watchPollGuard";
 
 export type PrRow = {
   number: number;
@@ -95,6 +100,12 @@ export type HotfixPrViewState = {
   listLoading: boolean;
   hotfixCli: HotfixCliOptions;
   prListView: PrListViewOptions;
+  /**
+   * True while `runHotfixDeploy` is awaiting (hotfix PR merged, deploy
+   * workflows dispatching/running). Stop is a no-op in this window because
+   * killing the shell would leave an orphan dispatched run on GitHub's side.
+   */
+  deployRunning: boolean;
 };
 
 export class PrTreeProvider {
@@ -102,6 +113,9 @@ export class PrTreeProvider {
     PrRow | undefined | void
   >();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  /** Last value we pushed to the `fordefiHotfix.deployRunning` context key. */
+  private lastDeployRunningContext = false;
 
   private rows: PrRow[] = [];
   private selected = new Set<number>();
@@ -113,6 +127,21 @@ export class PrTreeProvider {
   private watchEntries: WatchPanelEntry[] = [];
   private pollTimer: ReturnType<typeof setInterval> | undefined;
   private statusMessage = "";
+  /**
+   * Re-entrancy guard for {@link pollOnce}. Ensures the direct `void pollOnce()`
+   * call from `startWatch` and the `setInterval` tick cannot both run the
+   * body concurrently, and that the "all merged" handoff dispatches exactly
+   * once per watch even when they briefly overlap.
+   */
+  private readonly pollGate = new MergeHandoffGate();
+  /**
+   * Frozen at `startWatch` time so a user toggling the env / deploy pills
+   * mid-watch cannot retroactively alter the in-flight deploy. The panel
+   * banner uses this snapshot so the displayed flags match what will actually
+   * run.
+   */
+  private watchCtx: { cli: HotfixCliOptions; prNumbers: number[] } | null = null;
+  private deployRunning = false;
   /** When set, the webview banner shows the hotfix-PR deploy-phase watch entry instead of the initial merge watch. */
   private deployPhase: {
     prNumber: number;
@@ -182,7 +211,25 @@ export class PrTreeProvider {
     this._onDidChangeTreeData.fire();
   }
 
+  /**
+   * Push `deployRunning` into a VS Code context key so the view-title Stop
+   * button can hide itself via `when: !fordefiHotfix.deployRunning`. Called
+   * from the state-change sites; guarded so we don't spam the context API.
+   */
+  private syncDeployRunningContext(): void {
+    if (this.lastDeployRunningContext === this.deployRunning) {
+      return;
+    }
+    this.lastDeployRunningContext = this.deployRunning;
+    void vscode.commands.executeCommand(
+      "setContext",
+      "fordefiHotfix.deployRunning",
+      this.deployRunning
+    );
+  }
+
   getViewState(): HotfixPrViewState {
+    this.syncDeployRunningContext();
     return {
       rows: this.buildDisplayRows(),
       selected: this.getSelectedNumbers(),
@@ -198,6 +245,7 @@ export class PrTreeProvider {
       listLoading: this.listLoading,
       hotfixCli: { ...this.hotfixCli },
       prListView: { ...this.prListView },
+      deployRunning: this.deployRunning,
     };
   }
 
@@ -215,6 +263,10 @@ export class PrTreeProvider {
     if (!this.watching) {
       return null;
     }
+    // Prefer the frozen snapshot so banners never disagree with what will
+    // actually run; fall back to the live settings only before startWatch has
+    // had a chance to snapshot (defensive — shouldn't happen in practice).
+    const cli = this.watchCtx?.cli ?? this.hotfixCli;
     if (this.deployPhase) {
       const d = this.deployPhase;
       return {
@@ -228,7 +280,7 @@ export class PrTreeProvider {
           },
         ],
         statusLine: this.statusMessage,
-        hotfixSummary: `Waiting on hotfix PR #${d.prNumber} to merge → then deploy ${this.hotfixCli.env}`,
+        hotfixSummary: `Waiting on hotfix PR #${d.prNumber} to merge → then deploy ${cli.env}`,
       };
     }
     if (this.watchTarget.length === 0) {
@@ -250,7 +302,7 @@ export class PrTreeProvider {
       targets: [...this.watchTarget],
       entries,
       statusLine: this.statusMessage,
-      hotfixSummary: this.formatHotfixWatchSummary(this.hotfixCli),
+      hotfixSummary: this.formatHotfixWatchSummary(cli),
     };
   }
 
@@ -516,15 +568,21 @@ export class PrTreeProvider {
       );
       return;
     }
+    // Deep-copy so subsequent `setHotfixCliOptions` calls (env/deploy toggles)
+    // cannot mutate the in-flight watch.
+    const frozenCli: HotfixCliOptions = { ...this.hotfixCli };
     try {
-      buildHotfixCommand(nums, this.hotfixCli);
+      buildHotfixCommand(nums, frozenCli);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       void vscode.window.showErrorMessage(msg);
       return;
     }
+    this.watchCtx = { cli: frozenCli, prNumbers: [...nums] };
     this.watchTarget = nums;
     this.watching = true;
+    this.pollGate.reset();
+    this.deployRunning = false;
     this.watchEntries = nums.map((n) => {
       const row = this.rows.find((r) => r.number === n);
       return {
@@ -544,6 +602,16 @@ export class PrTreeProvider {
   }
 
   stopWatch(): void {
+    // UI-honest behavior: once `runHotfixDeploy` is in flight the dispatched
+    // workflow lives on GitHub; the best thing the extension can do is leave
+    // it alone. Log a hint and return without touching state so the banner
+    // keeps showing "Deploying…".
+    if (this.deployRunning) {
+      console.info(
+        "[fordefi-hotfix] Stop pressed during deploy phase — workflow already dispatched, letting it finish."
+      );
+      return;
+    }
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = undefined;
@@ -556,6 +624,8 @@ export class PrTreeProvider {
     this.watchEntries = [];
     this.statusMessage = "";
     this.deployPhase = null;
+    this.watchCtx = null;
+    this.pollGate.reset();
     this._onDidChangeTreeData.fire();
   }
 
@@ -563,112 +633,125 @@ export class PrTreeProvider {
     if (!this.watching || this.watchTarget.length === 0) {
       return;
     }
-    const token = await resolveGitHubToken(this.context);
-    if (!token) {
-      this.stopWatch();
-      void vscode.window.showErrorMessage(
-        "GitHub token missing; stopped watch."
-      );
-      return;
-    }
-    const { owner, repo } = getRepoConfig();
-    try {
-      const settled = await Promise.allSettled(
-        this.watchTarget.map((n) => getPullRequest(token, owner, repo, n))
-      );
-      const allFulfilled = settled.every(
-        (
-          r
-        ): r is PromiseFulfilledResult<
-          Awaited<ReturnType<typeof getPullRequest>>
-        > => r.status === "fulfilled"
-      );
-      if (allFulfilled) {
-        this.watchEntries = settled.map((r, i) => {
-          const p = r.value;
-          return {
-            number: this.watchTarget[i],
-            title: p.title,
-            state: p.state,
-            merged: Boolean(p.merged_at),
-          };
-        });
-      }
-      const phase = phaseFromSettledPulls(this.watchTarget, settled);
-      if (phase.kind === "stop_404") {
+    await this.pollGate.runPoll(async ({ claimMerge }) => {
+      const token = await resolveGitHubToken(this.context);
+      if (!token) {
         this.stopWatch();
         void vscode.window.showErrorMessage(
-          `Hotfix watch stopped: PR #${phase.prNumber} was not found.`
+          "GitHub token missing; stopped watch."
         );
         return;
       }
-      if (phase.kind === "poll_error") {
-        void vscode.window.showErrorMessage(
-          `Hotfix watch poll failed: ${phase.message}`
+      const { owner, repo } = getRepoConfig();
+      try {
+        const settled = await Promise.allSettled(
+          this.watchTarget.map((n) => getPullRequest(token, owner, repo, n))
         );
-        return;
-      }
-      if (phase.kind === "stop_closed") {
-        this.stopWatch();
-        const nums = phase.prNumbers.join(", #");
-        void vscode.window.showWarningMessage(
-          `Hotfix watch stopped: PR #${nums} closed without merging.`
+        const allFulfilled = settled.every(
+          (
+            r
+          ): r is PromiseFulfilledResult<
+            Awaited<ReturnType<typeof getPullRequest>>
+          > => r.status === "fulfilled"
         );
-        return;
-      }
-      if (phase.kind === "continue") {
-        this.statusMessage = `Waiting on #${phase.pendingNumbers.join(", #")}…`;
-        this._onDidChangeTreeData.fire();
-        return;
-      }
-      const mergedNumbers = [...this.watchTarget];
-      const deploy = this.hotfixCli.deploy;
-      const env = this.hotfixCli.env;
-      if (this.pollTimer) {
-        clearInterval(this.pollTimer);
-        this.pollTimer = undefined;
-      }
-      this.watchTarget = [];
-      this.watchEntries = [];
-      this.statusMessage = deploy
-        ? "Running hotfix CLI, then watching hotfix PR to deploy…"
-        : "";
-      if (!deploy) {
-        this.watching = false;
-      }
-      this._onDidChangeTreeData.fire();
+        if (allFulfilled) {
+          this.watchEntries = settled.map((r, i) => {
+            const p = r.value;
+            return {
+              number: this.watchTarget[i],
+              title: p.title,
+              state: p.state,
+              merged: Boolean(p.merged_at),
+            };
+          });
+        }
+        const phase = phaseFromSettledPulls(this.watchTarget, settled);
+        if (phase.kind === "stop_404") {
+          this.stopWatch();
+          void vscode.window.showErrorMessage(
+            `Hotfix watch stopped: PR #${phase.prNumber} was not found.`
+          );
+          return;
+        }
+        if (phase.kind === "poll_error") {
+          void vscode.window.showErrorMessage(
+            `Hotfix watch poll failed: ${phase.message}`
+          );
+          return;
+        }
+        if (phase.kind === "stop_closed") {
+          this.stopWatch();
+          const nums = phase.prNumbers.join(", #");
+          void vscode.window.showWarningMessage(
+            `Hotfix watch stopped: PR #${nums} closed without merging.`
+          );
+          return;
+        }
+        if (phase.kind === "continue") {
+          this.statusMessage = `Waiting on #${phase.pendingNumbers.join(", #")}…`;
+          this._onDidChangeTreeData.fire();
+          return;
+        }
 
-      const cmd = buildHotfixCommand(mergedNumbers, this.hotfixCli);
-      const cwd = getRepoRoot();
-      if (!cwd) {
-        this.watching = false;
+        // Claim the merge handoff before any `await`. If another poll raced
+        // past the gate's `pollInFlight` check and reached this branch too,
+        // only one of them will own the claim and dispatch fcli + deploy.
+        if (!claimMerge()) {
+          return;
+        }
+        const ctx = this.watchCtx ?? {
+          cli: { ...this.hotfixCli },
+          prNumbers: [...this.watchTarget],
+        };
+        const mergedNumbers = [...this.watchTarget];
+        const deploy = ctx.cli.deploy;
+        const env = ctx.cli.env;
+        if (this.pollTimer) {
+          clearInterval(this.pollTimer);
+          this.pollTimer = undefined;
+        }
+        this.watchTarget = [];
+        this.watchEntries = [];
+        this.statusMessage = deploy
+          ? "Running hotfix CLI, then watching hotfix PR to deploy…"
+          : "";
+        if (!deploy) {
+          this.watching = false;
+        }
         this._onDidChangeTreeData.fire();
-        void vscode.window.showErrorMessage(
-          "fordefiHotfix.repoRoot is empty and no workspace folder — set repo root in settings."
+
+        const cmd = buildHotfixCommand(mergedNumbers, ctx.cli);
+        const cwd = getRepoRoot();
+        if (!cwd) {
+          this.watching = false;
+          this._onDidChangeTreeData.fire();
+          void vscode.window.showErrorMessage(
+            "fordefiHotfix.repoRoot is empty and no workspace folder — set repo root in settings."
+          );
+          return;
+        }
+        void vscode.window.showInformationMessage(
+          `All PRs merged. Running hotfix command for ${mergedNumbers
+            .map((n) => `#${n}`)
+            .join(", ")}…`
         );
-        return;
-      }
-      void vscode.window.showInformationMessage(
-        `All PRs merged. Running hotfix command for ${mergedNumbers
-          .map((n) => `#${n}`)
-          .join(", ")}…`
-      );
-      const runResult = await runHotfixShellCommandAfterMerge({
-        command: cmd,
-        cwd,
-        prNumbers: mergedNumbers,
-      });
-      if (deploy) {
-        await this.handleDeployAfterFcli({
-          runResult,
-          env,
+        const runResult = await runHotfixShellCommandAfterMerge({
+          command: cmd,
           cwd,
+          prNumbers: mergedNumbers,
         });
+        if (deploy) {
+          await this.handleDeployAfterFcli({
+            runResult,
+            env,
+            cwd,
+          });
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        void vscode.window.showErrorMessage(`Hotfix watch poll failed: ${msg}`);
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      void vscode.window.showErrorMessage(`Hotfix watch poll failed: ${msg}`);
-    }
+    });
   }
 
   private async handleDeployAfterFcli(params: {
@@ -677,145 +760,158 @@ export class PrTreeProvider {
     cwd: string;
   }): Promise<void> {
     const { runResult, env, cwd } = params;
-    if (runResult.exitCode !== undefined && runResult.exitCode !== 0) {
-      this.stopWatch();
-      void vscode.window.showErrorMessage(
-        `Hotfix CLI failed — skipping deploy phase.`
-      );
-      return;
-    }
-
-    const parsed = await this.resolveHotfixPrForDeploy(runResult.hotfixPrUrl);
-    if (!parsed) {
-      this.stopWatch();
-      return;
-    }
-
-    const token = await resolveGitHubToken(this.context);
-    if (!token) {
-      this.stopWatch();
-      void vscode.window.showErrorMessage(
-        "GitHub token missing; cannot watch the hotfix PR for deploy."
-      );
-      return;
-    }
-
     const abort = { aborted: false };
-    this.watching = true;
-    this.deployPhase = {
-      prNumber: parsed.prNumber,
-      title: `PR #${parsed.prNumber}`,
-      state: "open",
-      merged: false,
-      owner: parsed.owner,
-      repo: parsed.repo,
-      abort,
-    };
-    this.statusMessage = `Waiting on hotfix PR #${parsed.prNumber} to merge…`;
-    this._onDidChangeTreeData.fire();
-
-    const watchResult = await watchHotfixPrMerge({
-      token,
-      owner: parsed.owner,
-      repo: parsed.repo,
-      prNumber: parsed.prNumber,
-      intervalMs: getHotfixPrPollIntervalMs(),
-      signal: abort,
-      onPhase: (phase) => {
-        if (!this.deployPhase) {
-          return;
-        }
-        if (phase.kind === "waiting" || phase.kind === "merged" || phase.kind === "closed") {
-          const p = phase.pull;
-          this.deployPhase.title = p.title;
-          this.deployPhase.state = p.state;
-          this.deployPhase.merged = Boolean(p.merged_at);
-        }
-        if (phase.kind === "waiting") {
-          this.statusMessage = `Waiting on hotfix PR #${parsed.prNumber} to merge…`;
-        } else if (phase.kind === "error") {
-          this.statusMessage = `Hotfix PR poll error — retrying… (${phase.message})`;
-        }
-        this._onDidChangeTreeData.fire();
-      },
-    });
-
-    if (watchResult.kind === "aborted") {
-      return;
-    }
-    if (watchResult.kind === "not_found") {
-      this.stopWatch();
-      void vscode.window.showErrorMessage(
-        `Hotfix deploy aborted: PR #${parsed.prNumber} was not found in ${parsed.owner}/${parsed.repo}.`
-      );
-      return;
-    }
-    if (watchResult.kind === "closed") {
-      this.stopWatch();
-      void vscode.window.showWarningMessage(
-        `Hotfix deploy aborted: PR #${parsed.prNumber} closed without merging.`
-      );
-      return;
-    }
-    if (watchResult.kind === "error") {
-      this.stopWatch();
-      void vscode.window.showErrorMessage(
-        `Hotfix PR watch failed: ${watchResult.message}`
-      );
-      return;
-    }
-
-    // merged → dispatch workflows
-    this.statusMessage = `Hotfix PR #${parsed.prNumber} merged. Dispatching ${env} workflow(s)…`;
-    this._onDidChangeTreeData.fire();
-
+    const { owner: fallbackOwner, repo: fallbackRepo } = getRepoConfig();
     const wf = getWorkflowsRepoConfig();
-    const targets = {
+    const workflowsTargets = {
       repoSlug: `${wf.owner}/${wf.repo}`,
       preWorkflow: wf.preWorkflow,
       prodWorkflow: wf.prodWorkflow,
       ref: wf.ref,
     };
-    void vscode.window.showInformationMessage(
-      `Hotfix PR #${parsed.prNumber} merged. Dispatching ${describeEnv(env)}…`
-    );
-    const deployResult = await runHotfixDeploy({ env, targets, cwd });
-    this.stopWatch();
-    if (!deployResult.ok) {
-      void vscode.window.showErrorMessage(
-        `Hotfix deploy did not complete successfully (exit ${
-          deployResult.exitCode ?? "unknown"
-        }).`
-      );
-    }
-  }
 
-  private async resolveHotfixPrForDeploy(
-    parsedUrl: string | undefined
-  ): Promise<{ owner: string; repo: string; prNumber: number } | undefined> {
-    if (parsedUrl) {
-      const parsed = parseGithubPullUrl(parsedUrl);
-      if (parsed) {
-        return parsed;
-      }
-    }
-    const { owner: fallbackOwner, repo: fallbackRepo } = getRepoConfig();
-    const answer = await vscode.window.showInputBox({
-      title: "Hotfix PR URL (for deploy)",
-      prompt: `fcli did not emit HOTFIX_PR_URL=... Paste the created hotfix PR URL in ${fallbackOwner}/${fallbackRepo} to continue the deploy, or press Esc to cancel.`,
-      placeHolder: `https://github.com/${fallbackOwner}/${fallbackRepo}/pull/123`,
-      ignoreFocusOut: true,
-      validateInput: (value) => {
-        const v = value.trim();
-        if (!v) return "Enter a GitHub PR URL";
-        return parseGithubPullUrl(v) ? null : "Not a recognized GitHub PR URL";
+    const result = await orchestrateDeployAfterFcli({
+      runResult,
+      env,
+      cwd,
+      fallbackRepo: { owner: fallbackOwner, repo: fallbackRepo },
+      deps: {
+        resolveToken: () => resolveGitHubToken(this.context),
+        watchPr: watchHotfixPrMerge,
+        runDeploy: runHotfixDeploy,
+        askForHotfixUrl: (fb) => askForHotfixPrUrl(fb),
+        pollIntervalMs: getHotfixPrPollIntervalMs(),
+        workflowsTargets,
+        abort,
+        hooks: {
+          onResolvedPr: (parsed) => {
+            this.watching = true;
+            this.deployPhase = {
+              prNumber: parsed.prNumber,
+              title: `PR #${parsed.prNumber}`,
+              state: "open",
+              merged: false,
+              owner: parsed.owner,
+              repo: parsed.repo,
+              abort,
+            };
+            this.statusMessage = `Waiting on hotfix PR #${parsed.prNumber} to merge…`;
+            this._onDidChangeTreeData.fire();
+          },
+          onWatchPhase: (phase) => {
+            if (!this.deployPhase) {
+              return;
+            }
+            if (
+              phase.kind === "waiting" ||
+              phase.kind === "merged" ||
+              phase.kind === "closed"
+            ) {
+              const p = phase.pull;
+              this.deployPhase.title = p.title;
+              this.deployPhase.state = p.state;
+              this.deployPhase.merged = Boolean(p.merged_at);
+            }
+            if (phase.kind === "waiting") {
+              this.statusMessage = `Waiting on hotfix PR #${this.deployPhase.prNumber} to merge…`;
+            } else if (phase.kind === "error") {
+              this.statusMessage = `Hotfix PR poll error — retrying… (${phase.message})`;
+            }
+            this._onDidChangeTreeData.fire();
+          },
+          onDeployDispatchStart: (dispatchEnv) => {
+            this.deployRunning = true;
+            this.statusMessage = `Hotfix PR merged. Dispatching ${dispatchEnv} workflow(s) — Stop is disabled once dispatched.`;
+            this._onDidChangeTreeData.fire();
+            void vscode.window.showInformationMessage(
+              `Hotfix PR merged. Dispatching ${describeEnv(dispatchEnv)}…`
+            );
+          },
+          onDeployDispatchEnd: () => {
+            this.deployRunning = false;
+            this._onDidChangeTreeData.fire();
+          },
+        },
       },
     });
-    if (!answer) {
-      return undefined;
-    }
-    return parseGithubPullUrl(answer.trim());
+
+    this.applyDeployOrchestratorResult(result);
   }
+
+  private applyDeployOrchestratorResult(
+    result: DeployOrchestratorResult
+  ): void {
+    switch (result.kind) {
+      case "fcli_failed":
+        this.stopWatch();
+        void vscode.window.showErrorMessage(
+          `Hotfix CLI failed — skipping deploy phase.`
+        );
+        return;
+      case "cancelled_no_url":
+        this.stopWatch();
+        return;
+      case "no_token":
+        this.stopWatch();
+        void vscode.window.showErrorMessage(
+          "GitHub token missing; cannot watch the hotfix PR for deploy."
+        );
+        return;
+      case "aborted":
+        // User pressed Stop before deploy kicked in — `stopWatch` already
+        // cleared state. Don't call it again.
+        return;
+      case "pr_not_found":
+        this.stopWatch();
+        void vscode.window.showErrorMessage(
+          `Hotfix deploy aborted: PR #${result.prNumber} was not found in ${result.owner}/${result.repo}.`
+        );
+        return;
+      case "pr_closed_without_merge":
+        this.stopWatch();
+        void vscode.window.showWarningMessage(
+          `Hotfix deploy aborted: PR #${result.prNumber} closed without merging.`
+        );
+        return;
+      case "watch_error":
+        this.stopWatch();
+        void vscode.window.showErrorMessage(
+          `Hotfix PR watch failed: ${result.message}`
+        );
+        return;
+      case "deploy_failed":
+        this.deployRunning = false;
+        this.stopWatch();
+        void vscode.window.showErrorMessage(
+          `Hotfix deploy did not complete successfully (exit ${
+            result.exitCode ?? "unknown"
+          }).`
+        );
+        return;
+      case "deploy_succeeded":
+        this.deployRunning = false;
+        this.stopWatch();
+        return;
+    }
+  }
+}
+
+async function askForHotfixPrUrl(fallback: {
+  owner: string;
+  repo: string;
+}): Promise<string | undefined> {
+  const answer = await vscode.window.showInputBox({
+    title: "Hotfix PR URL (for deploy)",
+    prompt: `fcli did not emit HOTFIX_PR_URL=... Paste the created hotfix PR URL in ${fallback.owner}/${fallback.repo} to continue the deploy, or press Esc to cancel.`,
+    placeHolder: `https://github.com/${fallback.owner}/${fallback.repo}/pull/123`,
+    ignoreFocusOut: true,
+    validateInput: (value) => {
+      const v = value.trim();
+      if (!v) return "Enter a GitHub PR URL";
+      return parseGithubPullUrl(v) ? null : "Not a recognized GitHub PR URL";
+    },
+  });
+  return answer;
 }
 
 function describeEnv(env: HotfixCliOptions["env"]): string {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDeployShellScript,
-  buildGhRunWaitCommand,
+  buildGhRunListSnapshotLatestId,
+  buildGhWaitForNewAndCompleteRun,
   buildGhWorkflowRunCommand,
   shellQuote,
   type DeployTargets,
@@ -38,18 +39,61 @@ describe("buildGhWorkflowRunCommand", () => {
   });
 });
 
-describe("buildGhRunWaitCommand", () => {
-  it("polls for the most recent run and exits non-zero on non-success", () => {
-    const cmd = buildGhRunWaitCommand({
+describe("buildGhRunListSnapshotLatestId", () => {
+  it("captures the newest databaseId before dispatch (falls back to 0)", () => {
+    const s = buildGhRunListSnapshotLatestId({
       repoSlug: "arnac-io/workflows",
       workflow: "pre-hotfix.yml",
+      prevIdVar: "__hf_prev",
     });
-    expect(cmd).toContain(
-      "gh run list --repo 'arnac-io/workflows' --workflow 'pre-hotfix.yml'"
+    expect(s).toContain(
+      "gh run list --repo 'arnac-io/workflows' --workflow 'pre-hotfix.yml' --limit 5 --json databaseId"
     );
+    expect(s).toContain("| max // 0");
+    expect(s).toMatch(/^__hf_prev=/);
+  });
+});
+
+describe("buildGhWaitForNewAndCompleteRun", () => {
+  const cmd = buildGhWaitForNewAndCompleteRun({
+    repoSlug: "arnac-io/workflows",
+    workflow: "pre-hotfix.yml",
+    prevIdVar: "__hf_prev",
+    runIdVar: "__hf_id",
+  });
+
+  it("waits for a databaseId strictly greater than the snapshot", () => {
+    expect(cmd).toContain("select(. > $__hf_prev)");
+  });
+
+  it("uses `gh run view` with per-field -q to avoid multi-line JSON parsing", () => {
+    expect(cmd).toContain(
+      `gh run view "$__hf_id" --repo 'arnac-io/workflows' --json status -q '.status'`
+    );
+    expect(cmd).toContain(
+      `gh run view "$__hf_id" --repo 'arnac-io/workflows' --json conclusion -q '.conclusion'`
+    );
+  });
+
+  it("checks completion and fails on non-success conclusion", () => {
     expect(cmd).toContain(`if [ "$__hf_status" = "completed" ]; then`);
     expect(cmd).toContain(`if [ "$__hf_conclusion" = "success" ]; then`);
     expect(cmd).toContain("exit 1");
+  });
+
+  it("honors poll/timeout overrides", () => {
+    const custom = buildGhWaitForNewAndCompleteRun({
+      repoSlug: "o/r",
+      workflow: "wf.yml",
+      prevIdVar: "PREV",
+      runIdVar: "ID",
+      pollSeconds: 4,
+      newRunTimeoutSeconds: 120,
+      completionTimeoutSeconds: 900,
+    });
+    expect(custom).toContain("sleep 4");
+    expect(custom).toContain("-ge 120");
+    expect(custom).toContain("-ge 900");
   });
 });
 
@@ -81,18 +125,21 @@ describe("buildDeployShellScript", () => {
     ).toThrow(/unsupported env/);
   });
 
-  it("both: dispatches pre, waits for success, then prod", () => {
+  it("both: snapshots pre id BEFORE dispatch, waits for the new run, then prod", () => {
     const s = buildDeployShellScript("both", targets);
+    const snapshotIdx = s.indexOf("__hf_prev=$(gh run list");
     const preDispatchIdx = s.indexOf(
       "gh workflow run 'pre-hotfix.yml' --repo 'arnac-io/workflows' --ref 'main'"
     );
-    const waitIdx = s.indexOf("[deploy] waiting for pre-hotfix.yml");
+    const waitIdx = s.indexOf("waiting for new pre-hotfix.yml run to appear");
     const prodDispatchIdx = s.indexOf(
       "gh workflow run 'production-hotfix.yml' --repo 'arnac-io/workflows' --ref 'main'"
     );
-    expect(preDispatchIdx).toBeGreaterThan(-1);
+    expect(snapshotIdx).toBeGreaterThanOrEqual(0);
+    expect(preDispatchIdx).toBeGreaterThan(snapshotIdx);
     expect(waitIdx).toBeGreaterThan(preDispatchIdx);
     expect(prodDispatchIdx).toBeGreaterThan(waitIdx);
     expect(s).toContain(`if [ "$__hf_conclusion" = "success" ]; then`);
+    expect(s).toContain("select(. > $__hf_prev)");
   });
 });

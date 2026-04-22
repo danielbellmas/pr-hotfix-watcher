@@ -37,6 +37,17 @@ export class GitHubError extends Error {
   }
 }
 
+/**
+ * Handler invoked on any 401 response. Registered by `extension.ts` to bust
+ * the `gh auth token` cache so a fresh `gh auth login` recovers on the very
+ * next API call instead of waiting out the 30-second cache TTL.
+ */
+let authFailureHandler: (() => void) | undefined;
+
+export function setAuthFailureHandler(fn: (() => void) | undefined): void {
+  authFailureHandler = fn;
+}
+
 async function githubJson<T>(
   path: string,
   token: string,
@@ -53,6 +64,13 @@ async function githubJson<T>(
   });
   const text = await res.text();
   if (!res.ok) {
+    if (res.status === 401 && authFailureHandler) {
+      try {
+        authFailureHandler();
+      } catch {
+        // swallow — cache invalidation is best-effort
+      }
+    }
     throw new GitHubError(text || res.statusText, res.status);
   }
   return text ? (JSON.parse(text) as T) : ({} as T);

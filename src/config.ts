@@ -7,10 +7,37 @@ import { parseHotfixRunMode, type HotfixRunMode } from "./hotfixRunHelpers";
 const SECRET_KEY = "fordefiHotfix.githubPat";
 
 /**
+ * Cache a successful/failed `gh auth token` lookup for a short window so the
+ * watch-poll loop doesn't block the extension host with an 8-second sync spawn
+ * on every tick. Invalidated explicitly on token-affecting user actions (see
+ * {@link invalidateGhTokenCache}) and on any 401 response from the GitHub API
+ * (wired in {@link ./extension.ts}).
+ */
+const GH_TOKEN_TTL_MS = 30_000;
+type GhTokenCacheEntry = {
+  executable: string;
+  value: string | undefined;
+  at: number;
+};
+let ghTokenCache: GhTokenCacheEntry | undefined;
+
+export function invalidateGhTokenCache(): void {
+  ghTokenCache = undefined;
+}
+
+/**
  * Same idea as Fordefi CLI: use the token from `gh auth login` when available.
  * VS Code’s environment often lacks a login shell, so `gh` must be on `PATH`.
  */
 export function tokenFromGhCli(executable: string = "gh"): string | undefined {
+  const now = Date.now();
+  if (
+    ghTokenCache &&
+    ghTokenCache.executable === executable &&
+    now - ghTokenCache.at < GH_TOKEN_TTL_MS
+  ) {
+    return ghTokenCache.value;
+  }
   try {
     const out = cp.execFileSync(executable, ["auth", "token"], {
       encoding: "utf8",
@@ -18,9 +45,11 @@ export function tokenFromGhCli(executable: string = "gh"): string | undefined {
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
-    const t = out.trim();
-    return t || undefined;
+    const t = out.trim() || undefined;
+    ghTokenCache = { executable, value: t, at: now };
+    return t;
   } catch {
+    ghTokenCache = { executable, value: undefined, at: now };
     return undefined;
   }
 }
@@ -59,12 +88,14 @@ export async function storeGitHubToken(
   token: string
 ): Promise<void> {
   await context.secrets.store(SECRET_KEY, token.trim());
+  invalidateGhTokenCache();
 }
 
 export async function clearStoredGithubToken(
   context: vscode.ExtensionContext
 ): Promise<void> {
   await context.secrets.delete(SECRET_KEY);
+  invalidateGhTokenCache();
 }
 
 export function getRepoConfig(): { owner: string; repo: string } {

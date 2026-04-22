@@ -788,7 +788,11 @@ function getHtml(
       meta.innerHTML = parts.join(" · ") || "Ready when you are.";
 
       const pillHtml = [];
-      if (state.watching) {
+      if (state.deployRunning) {
+        pillHtml.push(
+          '<span class="pill live" title="Workflow has been dispatched on GitHub — Stop is disabled to avoid orphaning the run.">🚀 Deploy running · Stop disabled</span>'
+        );
+      } else if (state.watching) {
         pillHtml.push('<span class="pill live">👀 Live watch</span>');
       }
       if (state.loadError) {

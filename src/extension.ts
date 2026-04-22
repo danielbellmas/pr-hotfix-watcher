@@ -2,17 +2,41 @@ import * as vscode from "vscode";
 import {
   clearStoredGithubToken,
   getRepoRoot,
+  invalidateGhTokenCache,
   storeGitHubToken,
 } from "./config";
 import { registerHotfixDeployOutputChannel } from "./deployRun";
 import { parseGitHubRepoFromRemote, readOriginRemote } from "./gitRemote";
+import { setAuthFailureHandler } from "./githubClient";
 import { registerHotfixCliOutputChannel } from "./hotfixRun";
 import { HotfixPrWebviewProvider } from "./hotfixPrWebview";
 import { PrTreeProvider } from "./prTreeProvider";
 
+/**
+ * Settings that, when changed, actually change the PR list. Everything else
+ * (terminal name, auto-confirm text, workflow file names, env defaults, etc.)
+ * must not blow away the search box or spin the list loader.
+ */
+const LIST_AFFECTING_KEYS = [
+  "fordefiHotfix.owner",
+  "fordefiHotfix.repo",
+  "fordefiHotfix.recentPrCount",
+  "fordefiHotfix.ghPath",
+  "fordefiHotfix.githubPat",
+];
+
+const TOKEN_AFFECTING_KEYS = [
+  "fordefiHotfix.ghPath",
+  "fordefiHotfix.githubPat",
+];
+
 export function activate(context: vscode.ExtensionContext): void {
   registerHotfixCliOutputChannel(context);
   registerHotfixDeployOutputChannel(context);
+  setAuthFailureHandler(() => invalidateGhTokenCache());
+  context.subscriptions.push({
+    dispose: () => setAuthFailureHandler(undefined),
+  });
   const provider = new PrTreeProvider(context);
   const webviewProvider = new HotfixPrWebviewProvider(provider);
 
@@ -107,7 +131,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("fordefiHotfix")) {
+      if (TOKEN_AFFECTING_KEYS.some((k) => e.affectsConfiguration(k))) {
+        invalidateGhTokenCache();
+      }
+      if (LIST_AFFECTING_KEYS.some((k) => e.affectsConfiguration(k))) {
         void provider.refresh();
       }
     })
