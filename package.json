@@ -236,13 +236,18 @@
     "watch": "tsc -watch -p ./",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e:compile": "tsc -p test/e2e/tsconfig.json",
+    "test:e2e": "npm run compile && npm run test:e2e:compile && node test/e2e/out/runTest.js",
     "verify": "npm run compile && npm run test",
     "package": "vsce package"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.94.0",
+    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.0",
+    "mocha": "^11.7.5",
     "typescript": "^5.4.0",
     "vitest": "^3.1.4"
   }
