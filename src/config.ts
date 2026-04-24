@@ -185,10 +185,11 @@ export function getHotfixPrPollIntervalMs(): number {
 
 export function buildHotfixCommand(
   prNumbers: number[],
-  hotfixCli: HotfixCliOptions
+  hotfixCli: HotfixCliOptions,
+  repoRootOverride?: string
 ): string {
   const { owner, repo } = getRepoConfig();
-  const repoRoot = getRepoRoot();
+  const repoRoot = repoRootOverride ?? getRepoRoot();
   const template = getCommandTemplate();
   const hotfixSuffix = buildHotfixCliSuffix(hotfixCli);
   return expandHotfixCommandTemplate(template, {

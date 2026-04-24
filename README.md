@@ -52,6 +52,46 @@ cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} --env p
 
 `{prNumbers}` is sorted ascending, space-separated. The underlying CLI still enforces merged PRs, Jira tickets in titles, etc.
 
+## Managed hotfix worktree
+
+To keep your primary `arnac` checkout free while the CLI runs, the extension automatically runs the hotfix command inside a dedicated **git worktree** it creates as a sibling of your `repoRoot`:
+
+```text
+<repoRoot>-hotfix-worktree
+```
+
+e.g. if `repoRoot = /Users/you/go/src/arnac` the worktree lives at `/Users/you/go/src/arnac-hotfix-worktree`. It's kept next to `arnac` on purpose: the same `direnv` layer and any paths relative to the monorepo parent still work.
+
+Behavior:
+
+- **Created on first run** via `git worktree add --detach <repoRoot>-hotfix-worktree origin/<default-branch>`. You'll see a one-time toast with the path plus a reminder to touch your YubiKey when the integrated terminal prompts.
+- **Reused as-is on every subsequent run.** The extension does not auto-fetch or reset it — that's intentional so nothing silently mutates between runs.
+- The integrated terminal still opens normally, so YubiKey and any `[y/n]` prompts work exactly as before; only the working directory changes.
+- If `git` is missing, the directory isn't a repo, or `git worktree add` fails, the extension falls back to running in `repoRoot` and logs the reason (`[worktree] fallback: …`) to the **Fordefi Hotfix CLI** output channel.
+
+First-time setup note: because the worktree is a new directory, you will need to run `direnv allow` in it once so `./fcli` gets its environment:
+
+```bash
+cd <repoRoot>-hotfix-worktree
+direnv allow
+```
+
+To refresh the worktree to the latest default branch:
+
+```bash
+cd <repoRoot>-hotfix-worktree
+git fetch origin && git reset --hard origin/main
+```
+
+To fully reset it, delete the directory and let the next run recreate it:
+
+```bash
+git -C <repoRoot> worktree remove <repoRoot>-hotfix-worktree
+# or, if git complains:
+rm -rf <repoRoot>-hotfix-worktree
+git -C <repoRoot> worktree prune
+```
+
 ## `direnv` / `fcli`
 
 The wrapper script typically runs `direnv exec . python …` when not already in a direnv-loaded shell. Open VS Code from a directory where direnv is applied, use a direnv VS Code extension, or bake `direnv exec .` into **commandTemplate**.

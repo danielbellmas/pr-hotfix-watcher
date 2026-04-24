@@ -34,6 +34,7 @@ import {
   runHotfixShellCommandAfterMerge,
   type HotfixShellRunResult,
 } from "./hotfixRun";
+import { ensureHotfixWorktree } from "./worktreeManager";
 import { parseGithubPullUrl } from "./hotfixRunHelpers";
 import {
   applyPrViewFilterSort,
@@ -720,9 +721,8 @@ export class PrTreeProvider {
         }
         this._onDidChangeTreeData.fire();
 
-        const cmd = buildHotfixCommand(mergedNumbers, ctx.cli);
-        const cwd = getRepoRoot();
-        if (!cwd) {
+        const baseRoot = getRepoRoot();
+        if (!baseRoot) {
           this.watching = false;
           this._onDidChangeTreeData.fire();
           void vscode.window.showErrorMessage(
@@ -730,6 +730,9 @@ export class PrTreeProvider {
           );
           return;
         }
+        const worktree = await ensureHotfixWorktree(baseRoot);
+        const cwd = worktree.path;
+        const cmd = buildHotfixCommand(mergedNumbers, ctx.cli, cwd);
         void vscode.window.showInformationMessage(
           `All PRs merged. Running hotfix command for ${mergedNumbers
             .map((n) => `#${n}`)
@@ -739,6 +742,13 @@ export class PrTreeProvider {
           command: cmd,
           cwd,
           prNumbers: mergedNumbers,
+          worktree: {
+            created: worktree.created,
+            fallback: worktree.fallback,
+            fallbackDetail: worktree.fallbackDetail,
+            notificationKey: `fordefiHotfix.worktree.${cwd}.notified`,
+            context: this.context,
+          },
         });
         if (deploy) {
           await this.handleDeployAfterFcli({

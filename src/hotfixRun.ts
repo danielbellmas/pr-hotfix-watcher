@@ -366,6 +366,27 @@ export type HotfixShellRunResult = {
   output: string;
 };
 
+export type WorktreeRunContext = {
+  /** True when `ensureHotfixWorktree` created the worktree on this invocation. */
+  created: boolean;
+  /** Present when `ensureHotfixWorktree` had to fall back to the original repo root. */
+  fallback?: string;
+  /** Optional human-readable detail paired with {@link fallback}. */
+  fallbackDetail?: string;
+  /**
+   * globalState key used to gate the one-time "touch your YubiKey" toast so we
+   * only show it on initial creation.
+   */
+  notificationKey?: string;
+  /** Extension context whose globalState backs {@link notificationKey}. */
+  context?: {
+    globalState: {
+      get<T>(key: string, fallback?: T): T | undefined;
+      update(key: string, value: unknown): Thenable<void> | Promise<void>;
+    };
+  };
+};
+
 /**
  * Runs the configured hotfix shell command after all watched PRs merged.
  * Mode `integratedTerminal` (default): real terminal for YubiKey / prompts; toasts when shell integration reports exit.
@@ -375,12 +396,26 @@ export async function runHotfixShellCommandAfterMerge(options: {
   command: string;
   cwd: string;
   prNumbers: readonly number[];
+  worktree?: WorktreeRunContext;
 }): Promise<HotfixShellRunResult> {
-  const { command, cwd, prNumbers } = options;
+  const { command, cwd, prNumbers, worktree } = options;
   const prs = formatPrLabels(prNumbers);
   const ch = getOutputChannel();
   appendRunHeader(ch, prs, command);
+  if (worktree?.fallback) {
+    ch.appendLine(
+      `[worktree] fallback: ${worktree.fallback}${
+        worktree.fallbackDetail ? ` — ${worktree.fallbackDetail}` : ""
+      } (running in ${cwd})`
+    );
+  } else {
+    ch.appendLine(
+      `[worktree] using ${cwd}${worktree?.created ? " (created)" : ""}`
+    );
+  }
   ch.show(true);
+
+  maybeNotifyFirstWorktreeCreation(cwd, worktree);
 
   const mode = getHotfixRunMode();
   const raw =
@@ -395,4 +430,24 @@ export async function runHotfixShellCommandAfterMerge(options: {
     hotfixPrUrl,
     output: raw.output,
   };
+}
+
+function maybeNotifyFirstWorktreeCreation(
+  cwd: string,
+  worktree: WorktreeRunContext | undefined
+): void {
+  if (!worktree?.created || worktree.fallback) {
+    return;
+  }
+  const key = worktree.notificationKey;
+  const gs = worktree.context?.globalState;
+  if (key && gs) {
+    if (gs.get<boolean>(key) === true) {
+      return;
+    }
+    void gs.update(key, true);
+  }
+  void vscode.window.showInformationMessage(
+    `Created hotfix worktree at ${cwd}. Touch your YubiKey when prompted in the Hotfix CLI terminal.`
+  );
 }

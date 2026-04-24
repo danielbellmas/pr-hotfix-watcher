@@ -45,6 +45,16 @@ vi.mock("../src/config", async (importOriginal) => {
   };
 });
 
+// Integration tests assert against repoRoot directly; we don't want the real
+// `git worktree add` to run against the dummy `/tmp/fake-repo` path, so stub the
+// manager to be a passthrough. worktreeManager has its own dedicated unit tests.
+vi.mock("../src/worktreeManager", () => ({
+  ensureHotfixWorktree: vi.fn(async (repoRoot: string) => ({
+    path: repoRoot,
+    created: false,
+  })),
+}));
+
 import * as cp from "node:child_process";
 import {
   getFakes,
