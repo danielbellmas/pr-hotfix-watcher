@@ -3,99 +3,69 @@ import * as vscode from "vscode";
 import { buildHotfixCliSuffix, type HotfixCliOptions } from "./hotfixCli";
 import { expandHotfixCommandTemplate } from "./hotfixCommandTemplate";
 import { parseHotfixRunMode, type HotfixRunMode } from "./hotfixRunHelpers";
+import { TokenResolver } from "./tokenResolver";
 
-const SECRET_KEY = "fordefiHotfix.githubPat";
-
-/**
- * Cache a successful/failed `gh auth token` lookup for a short window so the
- * watch-poll loop doesn't block the extension host with an 8-second sync spawn
- * on every tick. Invalidated explicitly on token-affecting user actions (see
- * {@link invalidateGhTokenCache}) and on any 401 response from the GitHub API
- * (wired in {@link ./extension.ts}).
- */
-const GH_TOKEN_TTL_MS = 30_000;
-type GhTokenCacheEntry = {
-  executable: string;
-  value: string | undefined;
-  at: number;
-};
-let ghTokenCache: GhTokenCacheEntry | undefined;
+// Lazy singleton: built on first use, kept across calls so the resolver's
+// internal `gh auth token` cache actually amortizes across watch-poll ticks.
+let _resolver: TokenResolver | undefined;
+function getTokenResolver(context: vscode.ExtensionContext): TokenResolver {
+  if (!_resolver) {
+    _resolver = new TokenResolver({
+      exec: (file, args, timeoutMs) => {
+        try {
+          return cp.execFileSync(file, args, {
+            encoding: "utf8",
+            timeout: timeoutMs,
+            stdio: ["ignore", "pipe", "pipe"],
+            windowsHide: true,
+          });
+        } catch {
+          return undefined;
+        }
+      },
+      secrets: {
+        get: (k) => Promise.resolve(context.secrets.get(k)),
+        store: (k, v) => Promise.resolve(context.secrets.store(k, v)),
+        delete: (k) => Promise.resolve(context.secrets.delete(k)),
+      },
+      config: {
+        ghPath: () =>
+          vscode.workspace
+            .getConfiguration("fordefiHotfix")
+            .get<string>("ghPath", "") ?? "",
+        githubPat: () =>
+          vscode.workspace
+            .getConfiguration("fordefiHotfix")
+            .get<string>("githubPat", "") ?? "",
+      },
+      envToken: () => process.env.GITHUB_ACCESS_TOKEN,
+      now: () => Date.now(),
+    });
+  }
+  return _resolver;
+}
 
 export function invalidateGhTokenCache(): void {
-  ghTokenCache = undefined;
+  _resolver?.invalidate();
 }
 
-/**
- * Same idea as Fordefi CLI: use the token from `gh auth login` when available.
- * VS Code’s environment often lacks a login shell, so `gh` must be on `PATH`.
- */
-export function tokenFromGhCli(executable: string = "gh"): string | undefined {
-  const now = Date.now();
-  if (
-    ghTokenCache &&
-    ghTokenCache.executable === executable &&
-    now - ghTokenCache.at < GH_TOKEN_TTL_MS
-  ) {
-    return ghTokenCache.value;
-  }
-  try {
-    const out = cp.execFileSync(executable, ["auth", "token"], {
-      encoding: "utf8",
-      timeout: 8000,
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-    const t = out.trim() || undefined;
-    ghTokenCache = { executable, value: t, at: now };
-    return t;
-  } catch {
-    ghTokenCache = { executable, value: undefined, at: now };
-    return undefined;
-  }
-}
-
-export async function resolveGitHubToken(
+export function resolveGitHubToken(
   context: vscode.ExtensionContext
 ): Promise<string | undefined> {
-  const ghExecutable =
-    vscode.workspace
-      .getConfiguration("fordefiHotfix")
-      .get<string>("ghPath", "")
-      ?.trim() || "gh";
-  const fromGh = tokenFromGhCli(ghExecutable);
-  if (fromGh) {
-    return fromGh;
-  }
-  const fromSecret = await context.secrets.get(SECRET_KEY);
-  if (fromSecret?.trim()) {
-    return fromSecret.trim();
-  }
-  const cfgPat = vscode.workspace
-    .getConfiguration("fordefiHotfix")
-    .get<string>("githubPat");
-  if (cfgPat?.trim()) {
-    return cfgPat.trim();
-  }
-  const fromEnv = process.env.GITHUB_ACCESS_TOKEN?.trim();
-  if (fromEnv) {
-    return fromEnv;
-  }
-  return undefined;
+  return getTokenResolver(context).resolve();
 }
 
-export async function storeGitHubToken(
+export function storeGitHubToken(
   context: vscode.ExtensionContext,
   token: string
 ): Promise<void> {
-  await context.secrets.store(SECRET_KEY, token.trim());
-  invalidateGhTokenCache();
+  return getTokenResolver(context).store(token);
 }
 
-export async function clearStoredGithubToken(
+export function clearStoredGithubToken(
   context: vscode.ExtensionContext
 ): Promise<void> {
-  await context.secrets.delete(SECRET_KEY);
-  invalidateGhTokenCache();
+  return getTokenResolver(context).clear();
 }
 
 export function getRepoConfig(): { owner: string; repo: string } {

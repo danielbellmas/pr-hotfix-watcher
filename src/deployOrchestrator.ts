@@ -7,7 +7,11 @@ import type {
   HotfixPrMergeWatchResult,
 } from "./hotfixPrMergeWatch";
 import type { HotfixShellRunResult } from "./hotfixRun";
-import { parseGithubPullUrl, type ParsedPrUrl } from "./hotfixRunHelpers";
+import {
+  parseGithubPullUrl,
+  type HotfixPrEntry,
+  type ParsedPrUrl,
+} from "./hotfixRunHelpers";
 
 /**
  * Pure orchestration of the post-fcli deploy flow. Separated from
@@ -51,6 +55,10 @@ export type DeployOrchestratorDeps = {
  * Terminal state of the deploy orchestration. The caller maps these to toasts
  * and the final `stopWatch()` call. Keeping this pure makes every branch easy
  * to unit-test.
+ *
+ * For multi-step deploys (env=both with JSON-parsed PRs), the failing step's
+ * tag is returned as-is — callers don't need to know whether step 1/2 of N
+ * failed, only that the overall flow stopped on this kind of failure.
  */
 export type DeployOrchestratorResult =
   | { kind: "fcli_failed"; exitCode: number }
@@ -65,10 +73,18 @@ export type DeployOrchestratorResult =
 
 export type OrchestrateDeployParams = {
   runResult: HotfixShellRunResult;
+  /** The env the user requested in the sidebar; used as the deploy env when fcli
+   *  did not emit a JSON payload (legacy regex / manual prompt path). */
   env: HotfixCliEnv;
   cwd: string;
   fallbackRepo: { owner: string; repo: string };
   deps: DeployOrchestratorDeps;
+};
+
+/** A single (PR → deploy env) pairing in the post-fcli queue. */
+type DeployStep = {
+  pr: ParsedPrUrl;
+  env: HotfixCliEnv;
 };
 
 /**
@@ -86,26 +102,119 @@ export async function orchestrateDeployAfterFcli(
     return { kind: "fcli_failed", exitCode: runResult.exitCode };
   }
 
-  const parsed = await resolveHotfixPr(
-    runResult.hotfixPrUrl,
+  const steps = await buildDeploySteps({
+    runResult,
+    requestedEnv: env,
     fallbackRepo,
-    deps.askForHotfixUrl
-  );
-  if (!parsed) {
+    askForHotfixUrl: deps.askForHotfixUrl,
+  });
+  if (!steps) {
     return { kind: "cancelled_no_url" };
   }
-  hooks.onResolvedPr?.(parsed);
 
   const token = await deps.resolveToken();
   if (!token) {
     return { kind: "no_token" };
   }
 
+  for (const step of steps) {
+    const stepResult = await runSingleDeployStep({
+      step,
+      token,
+      cwd,
+      deps,
+      hooks,
+    });
+    if (stepResult.kind !== "deploy_succeeded") {
+      return stepResult;
+    }
+  }
+  return { kind: "deploy_succeeded" };
+}
+
+/**
+ * Build the queue of `(PR, deploy env)` pairs from the fcli result. Three
+ * input shapes, in priority order:
+ *
+ *   1. `runResult.hotfixPrs` (parsed JSON payload, `-o json` opt-in) — one
+ *      step per env with the JSON-mapped env, so the user gets pre→deploy then
+ *      prod→deploy when they asked for both.
+ *   2. `runResult.hotfixPrUrl` (legacy `HOTFIX_PR_URL=` line) — single step
+ *      using the user-requested `env` (which may be `both`; the deploy script
+ *      handles the chained pre→prod dispatch in that case).
+ *   3. Neither emitted — prompt the user; treated like the legacy case.
+ *
+ * Returns `undefined` only when the user cancels the URL prompt; an empty
+ * JSON `prs` array also falls back to the prompt rather than returning
+ * "succeeded with nothing to do".
+ */
+async function buildDeploySteps(args: {
+  runResult: HotfixShellRunResult;
+  requestedEnv: HotfixCliEnv;
+  fallbackRepo: { owner: string; repo: string };
+  askForHotfixUrl: (fallback: {
+    owner: string;
+    repo: string;
+  }) => Promise<string | undefined>;
+}): Promise<DeployStep[] | undefined> {
+  const { runResult, requestedEnv, fallbackRepo, askForHotfixUrl } = args;
+
+  const fromJson = stepsFromJsonPayload(runResult.hotfixPrs);
+  if (fromJson.length > 0) {
+    return fromJson;
+  }
+
+  const parsed = await resolveHotfixPr(
+    runResult.hotfixPrUrl,
+    fallbackRepo,
+    askForHotfixUrl
+  );
+  if (!parsed) {
+    return undefined;
+  }
+  return [{ pr: parsed, env: requestedEnv }];
+}
+
+function stepsFromJsonPayload(
+  prs: HotfixPrEntry[] | undefined
+): DeployStep[] {
+  if (!prs || prs.length === 0) {
+    return [];
+  }
+  // Order: "pre" first then "prod", regardless of how fcli emitted them, so
+  // the deploy chain is always the natural pre→prod sequence even if fcli
+  // reorders the JSON entries in a future version.
+  const sorted = [...prs].sort((a, b) => orderRank(a.env) - orderRank(b.env));
+  const out: DeployStep[] = [];
+  for (const entry of sorted) {
+    const parsed = parseGithubPullUrl(entry.htmlUrl);
+    if (!parsed) {
+      continue;
+    }
+    out.push({ pr: parsed, env: entry.env });
+  }
+  return out;
+}
+
+function orderRank(env: HotfixPrEntry["env"]): number {
+  return env === "pre" ? 0 : 1;
+}
+
+async function runSingleDeployStep(args: {
+  step: DeployStep;
+  token: string;
+  cwd: string;
+  deps: DeployOrchestratorDeps;
+  hooks: DeployOrchestratorHooks;
+}): Promise<DeployOrchestratorResult> {
+  const { step, token, cwd, deps, hooks } = args;
+  hooks.onResolvedPr?.(step.pr);
+
   const watchResult = await deps.watchPr({
     token,
-    owner: parsed.owner,
-    repo: parsed.repo,
-    prNumber: parsed.prNumber,
+    owner: step.pr.owner,
+    repo: step.pr.repo,
+    prNumber: step.pr.prNumber,
     intervalMs: deps.pollIntervalMs,
     signal: deps.abort,
     onPhase: (phase) => hooks.onWatchPhase?.(phase),
@@ -117,32 +226,100 @@ export async function orchestrateDeployAfterFcli(
   if (watchResult.kind === "not_found") {
     return {
       kind: "pr_not_found",
-      owner: parsed.owner,
-      repo: parsed.repo,
-      prNumber: parsed.prNumber,
+      owner: step.pr.owner,
+      repo: step.pr.repo,
+      prNumber: step.pr.prNumber,
     };
   }
   if (watchResult.kind === "closed") {
-    return {
-      kind: "pr_closed_without_merge",
-      prNumber: parsed.prNumber,
-    };
+    return { kind: "pr_closed_without_merge", prNumber: step.pr.prNumber };
   }
   if (watchResult.kind === "error") {
     return { kind: "watch_error", message: watchResult.message };
   }
 
-  hooks.onDeployDispatchStart?.(env);
+  hooks.onDeployDispatchStart?.(step.env);
   const deployResult = await deps.runDeploy({
-    env,
+    env: step.env,
     targets: deps.workflowsTargets,
     cwd,
   });
   hooks.onDeployDispatchEnd?.(deployResult);
-  if (deployResult.ok) {
-    return { kind: "deploy_succeeded" };
+  if (!deployResult.ok) {
+    return { kind: "deploy_failed", exitCode: deployResult.exitCode };
   }
-  return { kind: "deploy_failed", exitCode: deployResult.exitCode };
+  return { kind: "deploy_succeeded" };
+}
+
+/**
+ * UI mapping for {@link DeployOrchestratorResult}. Lives next to the union so
+ * a new variant forces both changes in one file. `severity: null` → silent
+ * (user-cancelled or user-pressed-Stop). `stopsWatch: false` only for
+ * `aborted`, where `stopWatch` already ran.
+ */
+export type DeployOutcomeDescription = {
+  severity: "info" | "warn" | "error" | null;
+  message?: string;
+  stopsWatch: boolean;
+  deployEnded: boolean;
+};
+
+export function describeDeployOutcome(
+  result: DeployOrchestratorResult
+): DeployOutcomeDescription {
+  switch (result.kind) {
+    case "fcli_failed":
+      return {
+        severity: "error",
+        message: "Hotfix CLI failed — skipping deploy phase.",
+        stopsWatch: true,
+        deployEnded: false,
+      };
+    case "cancelled_no_url":
+      return { severity: null, stopsWatch: true, deployEnded: false };
+    case "no_token":
+      return {
+        severity: "error",
+        message:
+          "GitHub token missing; cannot watch the hotfix PR for deploy.",
+        stopsWatch: true,
+        deployEnded: false,
+      };
+    case "aborted":
+      return { severity: null, stopsWatch: false, deployEnded: false };
+    case "pr_not_found":
+      return {
+        severity: "error",
+        message: `Hotfix deploy aborted: PR #${result.prNumber} was not found in ${result.owner}/${result.repo}.`,
+        stopsWatch: true,
+        deployEnded: false,
+      };
+    case "pr_closed_without_merge":
+      return {
+        severity: "warn",
+        message: `Hotfix deploy aborted: PR #${result.prNumber} closed without merging.`,
+        stopsWatch: true,
+        deployEnded: false,
+      };
+    case "watch_error":
+      return {
+        severity: "error",
+        message: `Hotfix PR watch failed: ${result.message}`,
+        stopsWatch: true,
+        deployEnded: false,
+      };
+    case "deploy_failed":
+      return {
+        severity: "error",
+        message: `Hotfix deploy did not complete successfully (exit ${
+          result.exitCode ?? "unknown"
+        }).`,
+        stopsWatch: true,
+        deployEnded: true,
+      };
+    case "deploy_succeeded":
+      return { severity: null, stopsWatch: true, deployEnded: true };
+  }
 }
 
 async function resolveHotfixPr(

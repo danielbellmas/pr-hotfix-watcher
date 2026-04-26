@@ -1,9 +1,10 @@
 import type { GitHubPull } from "./githubClient";
-import { GitHubError } from "./githubClient";
+import { phaseFromHotfixSettled } from "./hotfixPrMergeWatch";
 
 /**
- * Outcome of one watch poll after all `getPullRequest` calls have settled.
- * Drives UI messages and whether the hotfix terminal is started.
+ * Aggregate phase across a batch of watched PRs. Per-PR classification is
+ * delegated to {@link phaseFromHotfixSettled} so the same primitive backs
+ * both this poll and the post-fcli hotfix-PR poll.
  */
 export type WatchPollPhase =
   | { kind: "continue"; pendingNumbers: number[] }
@@ -19,21 +20,18 @@ export function phaseFromSettledPulls(
   if (settled.length !== watchTarget.length) {
     return { kind: "poll_error", message: "watch poll: result count mismatch" };
   }
+  // First-error-wins so 404/transient-error reports the offending PR's
+  // index, not a folded-over later PR.
   const pulls: GitHubPull[] = [];
   for (let i = 0; i < settled.length; i++) {
-    const r = settled[i];
-    const n = watchTarget[i];
-    if (r.status === "rejected") {
-      const err = r.reason;
-      if (err instanceof GitHubError && err.status === 404) {
-        return { kind: "stop_404", prNumber: n };
-      }
-      return {
-        kind: "poll_error",
-        message: err instanceof Error ? err.message : String(err),
-      };
+    const phase = phaseFromHotfixSettled(settled[i]);
+    if (phase.kind === "not_found") {
+      return { kind: "stop_404", prNumber: watchTarget[i] };
     }
-    pulls.push(r.value);
+    if (phase.kind === "error") {
+      return { kind: "poll_error", message: phase.message };
+    }
+    pulls.push(phase.pull);
   }
   const closedWithoutMerge = pulls.filter(
     (p) => !p.merged_at && p.state === "closed"

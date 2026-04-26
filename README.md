@@ -52,6 +52,34 @@ cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} --env p
 
 `{prNumbers}` is sorted ascending, space-separated. The underlying CLI still enforces merged PRs, Jira tickets in titles, etc.
 
+### `-o json` and the deploy phase
+
+The bundled `fcli` accepts `--output json` (alias `-o json`). In JSON mode the
+human-readable output goes to stderr, no browser opens, and a single JSON line
+is written to stdout describing every hotfix PR that was created:
+
+```json
+{ "prs": [ { "environment": "pre", "pr_number": 123, "html_url": "…", "release_branch": "…", "hotfix_branch": "…", "draft": false } ], "source_pr_numbers": [42] }
+```
+
+The watcher prefers this payload when it is present and falls back to the
+legacy `HOTFIX_PR_URL=…` line (then to a manual prompt) otherwise. Adding
+`-o json` to the **commandTemplate** is the recommended setup, and is required
+for the pre→prod sequencing described below:
+
+```text
+cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} --env pre --env prod -o json
+```
+
+When the deploy toggle is on and the user picked **both** environments:
+
+- With `-o json`: the watcher watches the pre hotfix PR until it merges, runs
+  the pre deploy workflow, then watches the prod hotfix PR until it merges,
+  then runs the prod deploy workflow.
+- Without `-o json` (regex fallback): only one PR URL is recoverable, so the
+  watcher watches that single PR and dispatches the chained pre→prod deploy
+  script in one shot (legacy behavior).
+
 ## Managed hotfix worktree
 
 To keep your primary `arnac` checkout free while the CLI runs, the extension automatically runs the hotfix command inside a dedicated **git worktree** it creates as a sibling of your `repoRoot`:

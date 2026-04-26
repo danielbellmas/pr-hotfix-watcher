@@ -1,5 +1,8 @@
-import * as cp from "node:child_process";
 import * as vscode from "vscode";
+import {
+  runInIntegratedTerminal,
+  runViaSpawn,
+} from "./commandRunner";
 import {
   getHotfixRunMode,
   getHotfixTerminalAutoFirstConfirm,
@@ -9,14 +12,13 @@ import {
 } from "./config";
 import {
   formatPrLabels,
+  type HotfixPrEntry,
+  parseHotfixCliJson,
   parseHotfixPrUrl,
   truncateRunLogTail,
 } from "./hotfixRunHelpers";
 
 const OUTPUT_TITLE = "Fordefi Hotfix CLI";
-
-/** Wait for shell integration after creating a terminal (ms). */
-const SHELL_INTEGRATION_WAIT_MS = 8000;
 
 let outputChannel: vscode.OutputChannel | undefined;
 
@@ -142,40 +144,22 @@ async function runHotfixSpawnBackground(
   prs: string,
   ch: vscode.OutputChannel
 ): Promise<HotfixRunResult> {
-  let combined = "";
-  let resolvedExit: number | undefined;
-  await new Promise<void>((resolve) => {
-    const child = cp.spawn(command, {
-      shell: true,
-      cwd,
-      env: process.env,
-      windowsHide: true,
-    });
-
-    const onChunk = (chunk: Buffer): void => {
-      const t = chunk.toString();
-      combined = (combined + t).slice(-16000);
-      ch.append(t);
-    };
-
-    child.stdout?.on("data", onChunk);
-    child.stderr?.on("data", onChunk);
-
-    child.on("error", (err) => {
-      ch.appendLine(`[could not start process] ${err.message}`);
-      void vscode.window.showErrorMessage(
-        `Hotfix CLI could not start for ${prs}: ${err.message}`
-      );
-      resolve();
-    });
-
-    child.on("close", (code, signal) => {
-      notifySpawnClose(prs, code, signal, combined, ch);
-      resolvedExit = typeof code === "number" ? code : undefined;
-      resolve();
-    });
+  const result = await runViaSpawn({
+    command,
+    cwd,
+    shell: true,
+    captureOutput: true,
+    log: (chunk) => ch.append(chunk),
   });
-  return { exitCode: resolvedExit, output: combined };
+  if (result.spawnError) {
+    ch.appendLine(`[could not start process] ${result.spawnError.message}`);
+    void vscode.window.showErrorMessage(
+      `Hotfix CLI could not start for ${prs}: ${result.spawnError.message}`
+    );
+    return { exitCode: undefined, output: result.output };
+  }
+  notifySpawnClose(prs, result.exitCode ?? null, result.signal, result.output, ch);
+  return { exitCode: result.exitCode, output: result.output };
 }
 
 async function runHotfixIntegratedTerminal(
@@ -185,174 +169,28 @@ async function runHotfixIntegratedTerminal(
   ch: vscode.OutputChannel
 ): Promise<HotfixRunResult> {
   const terminalName = getHotfixTerminalName();
-  const terminal = vscode.window.createTerminal({ name: terminalName, cwd });
-  terminal.show(true);
-
-  let capturedOutput = "";
-  let resolvedExit: number | undefined;
-
-  await new Promise<void>((resolve) => {
-    let activeExecution: vscode.TerminalShellExecution | undefined;
-    let settled = false;
-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
-    let autoFirstConfirmTimer: ReturnType<typeof setTimeout> | undefined;
-    const disposables: vscode.Disposable[] = [];
-
-    const cleanup = (): void => {
-      if (fallbackTimer !== undefined) {
-        clearTimeout(fallbackTimer);
-        fallbackTimer = undefined;
+  const autoFirst = getHotfixTerminalAutoFirstConfirm()
+    ? {
+        text: getHotfixTerminalAutoFirstConfirmText(),
+        delayMs: getHotfixTerminalAutoFirstConfirmDelayMs(),
       }
-      if (autoFirstConfirmTimer !== undefined) {
-        clearTimeout(autoFirstConfirmTimer);
-        autoFirstConfirmTimer = undefined;
-      }
-      for (const d of disposables) {
-        d.dispose();
-      }
-    };
-
-    const done = (): void => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      resolve();
-    };
-
-    const scheduleAutoFirstConfirm = (): void => {
-      if (!getHotfixTerminalAutoFirstConfirm()) {
-        return;
-      }
-      const delay = getHotfixTerminalAutoFirstConfirmDelayMs();
-      const text = getHotfixTerminalAutoFirstConfirmText();
-      if (autoFirstConfirmTimer !== undefined) {
-        clearTimeout(autoFirstConfirmTimer);
-      }
-      autoFirstConfirmTimer = setTimeout(() => {
-        autoFirstConfirmTimer = undefined;
-        if (settled) {
-          return;
-        }
-        const addNewline = !/[\r\n]/.test(text);
-        ch.appendLine(
-          `[auto-confirm] sending first-prompt input after ${delay}ms`
-        );
-        try {
-          terminal.sendText(text, addNewline);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          ch.appendLine(`[auto-confirm] ${msg}`);
-        }
-      }, delay);
-    };
-
-    const consumeExecutionStream = async (
-      execution: vscode.TerminalShellExecution
-    ): Promise<void> => {
-      const maybeRead = (
-        execution as unknown as {
-          read?: () => AsyncIterable<string>;
-        }
-      ).read;
-      if (typeof maybeRead !== "function") {
-        return;
-      }
-      try {
-        for await (const chunk of maybeRead.call(execution)) {
-          capturedOutput = (capturedOutput + chunk).slice(-16000);
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        ch.appendLine(`[stream read failed] ${msg}`);
-      }
-    };
-
-    const tryExecute = (
-      si: vscode.TerminalShellIntegration | undefined
-    ): boolean => {
-      if (activeExecution || !si) {
-        return false;
-      }
-      try {
-        activeExecution = si.executeCommand(command);
-        if (fallbackTimer !== undefined) {
-          clearTimeout(fallbackTimer);
-          fallbackTimer = undefined;
-        }
-        scheduleAutoFirstConfirm();
-        void consumeExecutionStream(activeExecution);
-        return true;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        ch.appendLine(`[executeCommand failed] ${msg}`);
-        activeExecution = undefined;
-        return false;
-      }
-    };
-
-    const endSub = vscode.window.onDidEndTerminalShellExecution((e) => {
-      if (!activeExecution || e.execution !== activeExecution) {
-        return;
-      }
-      ch.appendLine(
-        `[shell integration] exit ${
-          e.exitCode === undefined ? "undefined" : String(e.exitCode)
-        }`
-      );
-      resolvedExit = e.exitCode;
-      notifyTerminalEnd(prs, e.exitCode, ch);
-      done();
-    });
-    disposables.push(endSub);
-
-    const fallbackSendText = (reason: string): void => {
-      if (activeExecution) {
-        return;
-      }
-      ch.appendLine(`[fallback] ${reason}`);
-      terminal.sendText(command, true);
-      void vscode.window.showInformationMessage(
-        `Hotfix command was sent to terminal “${terminalName}” for ${prs}. Complete YubiKey / prompts there — exit code is not available without shell integration.`
-      );
-      done();
-    };
-
-    if (tryExecute(terminal.shellIntegration)) {
-      return;
-    }
-
-    const intSub = vscode.window.onDidChangeTerminalShellIntegration((e) => {
-      if (e.terminal !== terminal) {
-        return;
-      }
-      if (tryExecute(e.shellIntegration)) {
-        intSub.dispose();
-        const i = disposables.indexOf(intSub);
-        if (i >= 0) {
-          disposables.splice(i, 1);
-        }
-      }
-    });
-    disposables.push(intSub);
-
-    fallbackTimer = setTimeout(() => {
-      if (activeExecution) {
-        return;
-      }
-      intSub.dispose();
-      const i = disposables.indexOf(intSub);
-      if (i >= 0) {
-        disposables.splice(i, 1);
-      }
-      fallbackSendText(
-        `no shell integration within ${SHELL_INTEGRATION_WAIT_MS}ms`
-      );
-    }, SHELL_INTEGRATION_WAIT_MS);
+    : undefined;
+  const result = await runInIntegratedTerminal({
+    command,
+    cwd,
+    terminalName,
+    log: (line) => ch.appendLine(line),
+    captureOutput: true,
+    autoFirstConfirm: autoFirst,
   });
-
-  return { exitCode: resolvedExit, output: capturedOutput };
+  if (result.fallbackUsed) {
+    void vscode.window.showInformationMessage(
+      `Hotfix command was sent to terminal “${terminalName}” for ${prs}. Complete YubiKey / prompts there — exit code is not available without shell integration.`
+    );
+  } else {
+    notifyTerminalEnd(prs, result.exitCode, ch);
+  }
+  return { exitCode: result.exitCode, output: result.output };
 }
 
 export type HotfixShellRunResult = {
@@ -360,8 +198,19 @@ export type HotfixShellRunResult = {
   exitCode: number | undefined;
   /** True when we have positive confirmation the command finished successfully. */
   ok: boolean;
-  /** Hotfix PR URL parsed from fcli output (e.g. `HOTFIX_PR_URL=...`). undefined when not emitted. */
+  /**
+   * Hotfix PR URL parsed from the legacy `HOTFIX_PR_URL=...` line. Kept for
+   * back-compat with older fcli builds that did not yet support `-o json`.
+   * When {@link hotfixPrs} is set it should be preferred over this field.
+   */
   hotfixPrUrl: string | undefined;
+  /**
+   * Hotfix PRs parsed from `fcli ... -o json` stdout payload (one entry per
+   * environment when the user asked for both pre and prod). `undefined` when
+   * fcli was invoked without `-o json` or the JSON payload was unreadable —
+   * callers should then fall back to {@link hotfixPrUrl}.
+   */
+  hotfixPrs?: HotfixPrEntry[];
   /** Captured command output (tail-bounded). May be empty when shell-integration read is unavailable. */
   output: string;
 };
@@ -423,11 +272,14 @@ export async function runHotfixShellCommandAfterMerge(options: {
       ? await runHotfixSpawnBackground(command, cwd, prs, ch)
       : await runHotfixIntegratedTerminal(command, cwd, prs, ch);
 
-  const hotfixPrUrl = parseHotfixPrUrl(raw.output);
+  const hotfixPrs = parseHotfixCliJson(raw.output);
+  const hotfixPrUrl =
+    hotfixPrs?.[0]?.htmlUrl ?? parseHotfixPrUrl(raw.output);
   return {
     exitCode: raw.exitCode,
     ok: raw.exitCode === 0,
     hotfixPrUrl,
+    hotfixPrs,
     output: raw.output,
   };
 }

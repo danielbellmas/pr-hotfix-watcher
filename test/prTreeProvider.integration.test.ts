@@ -89,9 +89,7 @@ async function waitFor(
     }
     await new Promise<void>((r) => setTimeout(r, 5));
   }
-  throw new Error(
-    `waitFor timed out${opts.label ? ` (${opts.label})` : ""}`
-  );
+  throw new Error(`waitFor timed out${opts.label ? ` (${opts.label})` : ""}`);
 }
 
 /** Minimum sane config for `buildHotfixCommand` + `pollOnce` repoRoot check. */
@@ -472,6 +470,177 @@ describe("PrTreeProvider integration", () => {
     expect(mockedRunFcli).toHaveBeenCalledTimes(1);
   });
 
+  it("deploy=false: upstream PR merges → fcli runs → watch ends clean, no deploy", async () => {
+    global.fetch = makeFetchStub({
+      [pullPath("acme", "app", 800)]: [
+        { body: buildPull({ number: 800, state: "open", merged_at: null }) },
+        {
+          body: buildPull({
+            number: 800,
+            state: "closed",
+            merged_at: "2026-04-22T12:00:00Z",
+          }),
+        },
+      ],
+    });
+    mockedRunFcli.mockResolvedValue({
+      exitCode: 0,
+      ok: true,
+      hotfixPrUrl: undefined,
+      output: "",
+    });
+
+    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    provider.setHotfixCliOptions({ deploy: false, env: "pre" });
+    provider.setCheckboxState(800, true);
+    provider.startWatch();
+
+    await waitFor(() => mockedRunFcli.mock.calls.length >= 1, {
+      label: "fcli invoked",
+    });
+    await waitFor(() => provider.getWatching() === false, {
+      label: "watch cleared after fcli (no deploy)",
+    });
+
+    expect(mockedRunFcli).toHaveBeenCalledTimes(1);
+    expect(mockedRunDeploy).not.toHaveBeenCalled();
+    expect(provider.getViewState().deployRunning).toBe(false);
+  });
+
+  // Real timing gate: hotfix PR is open on first poll, only merges on the
+  // second. Proves runDeploy waits for the actual merge-watch transition,
+  // not for a coincidentally-already-merged PR (as the happy path covers).
+  it("deploy waits for hotfix PR to actually transition open → merged", async () => {
+    global.fetch = makeFetchStub({
+      [pullPath("acme", "app", 850)]: [
+        {
+          body: buildPull({
+            number: 850,
+            state: "closed",
+            merged_at: "2026-04-22T12:00:00Z",
+          }),
+        },
+      ],
+      [pullPath("acme", "app", 851)]: [
+        { body: buildPull({ number: 851, state: "open", merged_at: null }) },
+        { body: buildPull({ number: 851, state: "open", merged_at: null }) },
+        {
+          body: buildPull({
+            number: 851,
+            state: "closed",
+            merged_at: "2026-04-22T12:10:00Z",
+          }),
+        },
+      ],
+    });
+    mockedRunFcli.mockResolvedValue({
+      exitCode: 0,
+      ok: true,
+      hotfixPrUrl: "https://github.com/acme/app/pull/851",
+      output: "HOTFIX_PR_URL=https://github.com/acme/app/pull/851\n",
+    });
+    mockedRunDeploy.mockResolvedValue({ exitCode: 0, ok: true });
+
+    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    provider.setHotfixCliOptions({ deploy: true, env: "pre" });
+    provider.setCheckboxState(850, true);
+    provider.startWatch();
+
+    await waitFor(() => mockedRunFcli.mock.calls.length >= 1, {
+      label: "fcli invoked after upstream merge",
+    });
+    // Hotfix PR (851) is still open — deploy must NOT have fired yet.
+    await new Promise((r) => setTimeout(r, 30));
+    expect(mockedRunDeploy).not.toHaveBeenCalled();
+
+    // The third response transitions 851 to merged; deploy then dispatches.
+    await waitFor(() => mockedRunDeploy.mock.calls.length >= 1, {
+      label: "deploy fires after hotfix PR merges",
+    });
+    expect(mockedRunDeploy).toHaveBeenCalledTimes(1);
+  });
+
+  it("upstream PR closed without merge stops the pre-fcli watch and warns", async () => {
+    global.fetch = makeFetchStub({
+      [pullPath("acme", "app", 870)]: [
+        {
+          body: buildPull({
+            number: 870,
+            state: "closed",
+            merged_at: null,
+          }),
+        },
+      ],
+    });
+
+    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    provider.setHotfixCliOptions({ deploy: true, env: "pre" });
+    provider.setCheckboxState(870, true);
+    provider.startWatch();
+
+    await waitFor(
+      () =>
+        getFakes()
+          .warn.mock.calls.map((c) => String(c[0]))
+          .some((s) => /closed without merging/.test(s)),
+      { label: "closed-without-merge warning on upstream PR" }
+    );
+
+    expect(mockedRunFcli).not.toHaveBeenCalled();
+    expect(mockedRunDeploy).not.toHaveBeenCalled();
+    expect(provider.getWatching()).toBe(false);
+  });
+
+  it("deploy non-zero exit: error toast fires and watch state clears", async () => {
+    global.fetch = makeFetchStub({
+      [pullPath("acme", "app", 880)]: [
+        {
+          body: buildPull({
+            number: 880,
+            state: "closed",
+            merged_at: "2026-04-22T12:00:00Z",
+          }),
+        },
+      ],
+      [pullPath("acme", "app", 881)]: [
+        {
+          body: buildPull({
+            number: 881,
+            state: "closed",
+            merged_at: "2026-04-22T12:05:00Z",
+          }),
+        },
+      ],
+    });
+    mockedRunFcli.mockResolvedValue({
+      exitCode: 0,
+      ok: true,
+      hotfixPrUrl: "https://github.com/acme/app/pull/881",
+      output: "",
+    });
+    mockedRunDeploy.mockResolvedValue({ exitCode: 7, ok: false });
+
+    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    provider.setHotfixCliOptions({ deploy: true, env: "pre" });
+    provider.setCheckboxState(880, true);
+    provider.startWatch();
+
+    await waitFor(
+      () =>
+        getFakes()
+          .error.mock.calls.map((c) => String(c[0]))
+          .some((s) => /deploy did not complete/i.test(s)),
+      { label: "deploy-failed error toast" }
+    );
+
+    expect(mockedRunDeploy).toHaveBeenCalledTimes(1);
+    expect(provider.getWatching()).toBe(false);
+    expect(provider.getViewState().deployRunning).toBe(false);
+    // Note: context-key transitions on deploy failure happen too quickly for
+    // the webview to have observed the intermediate `true`. Happy-path test
+    // covers the full true→false context-key cycle.
+  });
+
   it("token cache: many polls resolve to one execFileSync('gh auth token') call", async () => {
     global.fetch = makeFetchStub({
       [pullPath("acme", "app", 700)]: [
@@ -485,7 +654,9 @@ describe("PrTreeProvider integration", () => {
     provider.startWatch();
 
     await waitFor(
-      () => (global.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length >= 4,
+      () =>
+        (global.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls
+          .length >= 4,
       { label: ">=4 poll fetches" }
     );
 
