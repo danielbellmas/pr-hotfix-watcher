@@ -80,6 +80,22 @@ When the deploy toggle is on and the user picked **both** environments:
   watcher watches that single PR and dispatches the chained pre→prod deploy
   script in one shot (legacy behavior).
 
+## Deploy-finished notification (macOS)
+
+When a hotfix deploy finishes, the extension fires a native macOS Notification Center banner in addition to the in-VS-Code toast — so you get a heads-up even when VS Code is in the background. One ping per `runHotfixDeploy` resolution:
+
+- **Hotfix deploy succeeded** — exit 0.
+- **Hotfix deploy FAILED** — non-zero exit (`exit N` in the subtitle).
+- **Hotfix deploy finished** — terminal mode without shell integration reporting (subtitle: `exit unknown`).
+- **Hotfix deploy stopped** — process killed (signal in the subtitle, e.g. `SIGTERM`).
+- **Hotfix deploy did not start** — `spawn` failure before the deploy script ran.
+
+The body lists the source PR numbers you batched (e.g. `PRs: #123, #124`) so a stale notification still identifies the run.
+
+The pings are delivered via `osascript -e 'display notification …'`. The first time it runs on a fresh Mac, macOS shows a permission dialog asking whether **Script Editor** can post notifications — accept it, otherwise the first ping is silently dropped (subsequent ones work). To mute later: System Settings → Notifications → Script Editor. On non-macOS the notification is a no-op; the existing VS Code toasts still fire.
+
+Failures of the notifier itself (e.g. `osascript` missing) are logged to the **Fordefi Hotfix Deploy** output channel and never surfaced as a toast.
+
 ## Managed hotfix worktree
 
 To keep your primary `arnac` checkout free while the CLI runs, the extension automatically runs the hotfix command inside a dedicated **git worktree** it creates as a sibling of your `repoRoot`:

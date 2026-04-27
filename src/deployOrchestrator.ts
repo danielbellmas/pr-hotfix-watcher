@@ -38,6 +38,9 @@ export type DeployOrchestratorDeps = {
     env: HotfixCliEnv;
     targets: DeployTargets;
     cwd: string;
+    /** Rendered into the deploy-finished OS notification body so a stale
+     *  ping can be traced back to its run. No other behavioural impact. */
+    sourcePrNumbers?: readonly number[];
   }) => Promise<DeployRunResult>;
   /** Prompt the user for a hotfix PR URL when fcli did not emit one. Return `undefined` on cancel. */
   askForHotfixUrl: (fallback: {
@@ -78,6 +81,8 @@ export type OrchestrateDeployParams = {
   env: HotfixCliEnv;
   cwd: string;
   fallbackRepo: { owner: string; repo: string };
+  /** Forwarded to {@link DeployOrchestratorDeps.runDeploy}. */
+  sourcePrNumbers?: readonly number[];
   deps: DeployOrchestratorDeps;
 };
 
@@ -95,7 +100,7 @@ type DeployStep = {
 export async function orchestrateDeployAfterFcli(
   params: OrchestrateDeployParams
 ): Promise<DeployOrchestratorResult> {
-  const { runResult, env, cwd, fallbackRepo, deps } = params;
+  const { runResult, env, cwd, fallbackRepo, sourcePrNumbers, deps } = params;
   const hooks = deps.hooks ?? {};
 
   if (runResult.exitCode !== undefined && runResult.exitCode !== 0) {
@@ -122,6 +127,7 @@ export async function orchestrateDeployAfterFcli(
       step,
       token,
       cwd,
+      sourcePrNumbers,
       deps,
       hooks,
     });
@@ -204,10 +210,11 @@ async function runSingleDeployStep(args: {
   step: DeployStep;
   token: string;
   cwd: string;
+  sourcePrNumbers: readonly number[] | undefined;
   deps: DeployOrchestratorDeps;
   hooks: DeployOrchestratorHooks;
 }): Promise<DeployOrchestratorResult> {
-  const { step, token, cwd, deps, hooks } = args;
+  const { step, token, cwd, sourcePrNumbers, deps, hooks } = args;
   hooks.onResolvedPr?.(step.pr);
 
   const watchResult = await deps.watchPr({
@@ -243,6 +250,7 @@ async function runSingleDeployStep(args: {
     env: step.env,
     targets: deps.workflowsTargets,
     cwd,
+    sourcePrNumbers,
   });
   hooks.onDeployDispatchEnd?.(deployResult);
   if (!deployResult.ok) {

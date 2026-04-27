@@ -350,7 +350,12 @@ export class WatchSession {
       },
     });
     if (deploy) {
-      await this.handleDeployAfterFcli({ runResult, env, cwd });
+      await this.handleDeployAfterFcli({
+        runResult,
+        env,
+        cwd,
+        sourcePrNumbers: mergedNumbers,
+      });
     }
   }
 
@@ -358,8 +363,9 @@ export class WatchSession {
     runResult: HotfixShellRunResult;
     env: HotfixCliOptions["env"];
     cwd: string;
+    sourcePrNumbers: readonly number[];
   }): Promise<void> {
-    const { runResult, env, cwd } = params;
+    const { runResult, env, cwd, sourcePrNumbers } = params;
     const abort = { aborted: false };
     const { owner: fallbackOwner, repo: fallbackRepo } = getRepoConfig();
     const wf = getWorkflowsRepoConfig();
@@ -375,6 +381,7 @@ export class WatchSession {
       env,
       cwd,
       fallbackRepo: { owner: fallbackOwner, repo: fallbackRepo },
+      sourcePrNumbers,
       deps: {
         resolveToken: () => this.deps.resolveToken(),
         watchPr: watchHotfixPrMerge,
