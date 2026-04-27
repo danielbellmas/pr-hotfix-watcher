@@ -86,6 +86,31 @@ export type SearchResult = {
   total_count: number;
 };
 
+/**
+ * Subset of the Pulls List API response shape we consume for the author
+ * filter. Kept narrow on purpose — full payload has 30+ fields we don't need.
+ */
+type RepoPullListItem = {
+  number: number;
+  title: string;
+  state: string;
+  created_at: string;
+  html_url: string;
+  merged_at: string | null;
+  user: { login: string } | null;
+};
+
+/**
+ * "Recent PRs by `authorLogin` in `owner/repo`", sourced from the **Pulls
+ * List API** rather than `/search/issues`. The search index is observed to
+ * silently return 0 results for some private repos despite the PRs being
+ * fully accessible via the Pulls API — that broke the empty-state UX.
+ *
+ * Fetches the last 100 PRs (sorted by updated-desc) and filters by author
+ * client-side. Trade-off: a contributor whose last PR is older than the
+ * 100-most-recent in the repo will not appear; for the watcher's "queue
+ * recently-merged PRs to hotfix" use case that bound is acceptable.
+ */
 export async function searchAuthorPullRequests(
   token: string,
   owner: string,
@@ -93,13 +118,20 @@ export async function searchAuthorPullRequests(
   authorLogin: string,
   perPage: number
 ): Promise<SearchIssueItem[]> {
-  const q = `is:pr author:${authorLogin} repo:${owner}/${repo} sort:updated-desc`;
-  const path = `/search/issues?q=${encodeURIComponent(q)}&per_page=${Math.min(
-    perPage,
-    100
-  )}`;
-  const data = await githubJson<SearchResult>(path, token);
-  return data.items ?? [];
+  const path = `/repos/${owner}/${repo}/pulls?state=all&sort=updated&direction=desc&per_page=100`;
+  const data = await githubJson<RepoPullListItem[]>(path, token);
+  const limit = Math.max(1, Math.min(perPage, 100));
+  return data
+    .filter((p) => p.user?.login === authorLogin)
+    .slice(0, limit)
+    .map((p) => ({
+      number: p.number,
+      title: p.title,
+      state: p.state,
+      created_at: p.created_at,
+      html_url: p.html_url,
+      pull_request: { merged_at: p.merged_at },
+    }));
 }
 
 export async function searchRepoPullRequests(
