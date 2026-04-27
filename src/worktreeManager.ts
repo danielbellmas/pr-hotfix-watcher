@@ -49,6 +49,17 @@ const GIT_TIMEOUT_MS = 15_000;
  */
 export const HOTFIX_WORKTREE_SUFFIX = "-hotfix-worktree";
 
+/**
+ * Dedicated branch name the worktree's HEAD points at. Required because `fcli`
+ * calls `repo.active_branch.name` (gitpython), which raises on detached HEAD;
+ * a previous `--detach` strategy here broke `./fcli workflows hotfix
+ * create-pull-request` with `TypeError: HEAD is a detached symbolic reference`.
+ *
+ * Picked to be unlikely to collide with a real working branch — the worktree
+ * "owns" this branch and may reset it without warning.
+ */
+export const HOTFIX_WORKTREE_BRANCH = "hotfix-worktree";
+
 export function createDefaultWorktreeDeps(
   log?: (line: string) => void
 ): WorktreeDeps {
@@ -210,7 +221,8 @@ export async function ensureHotfixWorktree(
       repoRoot,
       "worktree",
       "add",
-      "--detach",
+      "-B",
+      HOTFIX_WORKTREE_BRANCH,
       wtPath,
       `origin/${branch}`,
     ],
@@ -226,6 +238,8 @@ export async function ensureHotfixWorktree(
     );
   }
 
-  deps.log?.(`[worktree] created: ${wtPath} (origin/${branch})`);
+  deps.log?.(
+    `[worktree] created: ${wtPath} (branch ${HOTFIX_WORKTREE_BRANCH} @ origin/${branch})`
+  );
   return { path: wtPath, created: true };
 }

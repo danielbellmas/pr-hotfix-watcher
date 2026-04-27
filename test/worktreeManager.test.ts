@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   computeWorktreePath,
   ensureHotfixWorktree,
+  HOTFIX_WORKTREE_BRANCH,
   resolveDefaultBranch,
   type ExecResult,
   type WorktreeDeps,
@@ -192,7 +193,10 @@ describe("ensureHotfixWorktree", () => {
         if (call.args.includes("--is-inside-work-tree")) {
           return ok("false\n");
         }
-        if (call.args.includes("symbolic-ref")) {
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
           return ok("origin/main\n");
         }
         return undefined;
@@ -213,18 +217,22 @@ describe("ensureHotfixWorktree", () => {
       repoRoot,
       "worktree",
       "add",
-      "--detach",
+      "-B",
+      HOTFIX_WORKTREE_BRANCH,
       expectedPath,
       "origin/main",
     ]);
   });
 
-  it("creates a fresh worktree at <repoRoot>-hotfix-worktree with detected default branch", async () => {
+  it("creates a fresh worktree on the dedicated branch (not detached) so fcli sees a branch name", async () => {
     const repoRoot = "/Users/me/go/src/arnac";
     const expectedPath = "/Users/me/go/src/arnac-hotfix-worktree";
     const { deps, calls, logs } = makeDeps({
       responder: (call) => {
-        if (call.args.includes("symbolic-ref")) {
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
           return ok("origin/develop\n");
         }
         return undefined;
@@ -241,8 +249,36 @@ describe("ensureHotfixWorktree", () => {
       (c) => c.args.includes("worktree") && c.args.includes("add")
     );
     expect(addCalls).toHaveLength(1);
+    expect(addCalls[0].args).not.toContain("--detach");
+    expect(addCalls[0].args).toContain("-B");
+    expect(addCalls[0].args).toContain(HOTFIX_WORKTREE_BRANCH);
     expect(addCalls[0].args.at(-1)).toBe("origin/develop");
     expect(logs.some((l) => l.startsWith("[worktree] created:"))).toBe(true);
+  });
+
+  it("never invokes any git command on the reused worktree beyond the existence/inside-worktree probe (create once, leave alone)", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const expectedPath = "/Users/me/go/src/arnac-hotfix-worktree";
+    const { deps, calls } = makeDeps({
+      existing: new Set([expectedPath]),
+      responder: (call) => {
+        if (call.args.includes("--is-inside-work-tree")) {
+          return ok("true\n");
+        }
+        return undefined;
+      },
+    });
+
+    await ensureHotfixWorktree(repoRoot, deps);
+
+    const wtMutating = calls.filter(
+      (c) =>
+        c.args.includes("checkout") ||
+        c.args.includes("fetch") ||
+        c.args.includes("reset") ||
+        (c.args.includes("worktree") && c.args.includes("add"))
+    );
+    expect(wtMutating).toHaveLength(0);
   });
 
   it("returns add-failed fallback when `git worktree add` fails", async () => {

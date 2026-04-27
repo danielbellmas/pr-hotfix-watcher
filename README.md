@@ -108,8 +108,8 @@ e.g. if `repoRoot = /Users/you/go/src/arnac` the worktree lives at `/Users/you/g
 
 Behavior:
 
-- **Created on first run** via `git worktree add --detach <repoRoot>-hotfix-worktree origin/<default-branch>`. You'll see a one-time toast with the path plus a reminder to touch your YubiKey when the integrated terminal prompts.
-- **Reused as-is on every subsequent run.** The extension does not auto-fetch or reset it — that's intentional so nothing silently mutates between runs.
+- **Created on first run** via `git worktree add -B hotfix-worktree <repoRoot>-hotfix-worktree origin/<default-branch>`. The dedicated `hotfix-worktree` branch is required because `fcli` reads `repo.active_branch.name` (gitpython) and a detached HEAD makes it raise `TypeError: HEAD is a detached symbolic reference`. You'll see a one-time toast with the path plus a reminder to touch your YubiKey when the integrated terminal prompts.
+- **Reused as-is on every subsequent run.** The extension does not auto-fetch, auto-reset, or otherwise touch the worktree — that's intentional so nothing silently mutates between runs. If the worktree ever gets into a bad state (e.g. detached HEAD from an older version of this extension), fix it manually once: `git -C <repoRoot>-hotfix-worktree checkout -B hotfix-worktree`. To wipe and recreate from scratch, use the cleanup commands lower in this section.
 - The integrated terminal still opens normally, so YubiKey and any `[y/n]` prompts work exactly as before; only the working directory changes.
 - If `git` is missing, the directory isn't a repo, or `git worktree add` fails, the extension falls back to running in `repoRoot` and logs the reason (`[worktree] fallback: …`) to the **Fordefi Hotfix CLI** output channel.
 
