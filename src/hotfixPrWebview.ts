@@ -215,7 +215,7 @@ function getHtml(
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 10px 10px 14px;
+      padding: 8px 10px 14px;
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
@@ -223,26 +223,57 @@ function getHtml(
       min-height: 100%;
     }
     .hero {
-      padding: 4px 2px 10px;
-      margin-bottom: 12px;
-      border-bottom: 1px solid color-mix(in srgb, var(--vscode-widget-border) 60%, transparent);
+      padding: 2px 2px 8px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-widget-border) 55%, transparent);
     }
-    .hero-inner { }
+    .hero-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+      min-height: 22px;
+    }
+    .skeleton {
+      display: inline-block;
+      border-radius: 4px;
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--vscode-foreground) 8%, transparent) 0%,
+        color-mix(in srgb, var(--vscode-foreground) 18%, transparent) 50%,
+        color-mix(in srgb, var(--vscode-foreground) 8%, transparent) 100%
+      );
+      background-size: 200% 100%;
+      animation: hf-shimmer 1.2s ease-in-out infinite;
+    }
+    .skeleton-meta { width: 110px; height: 12px; }
+    .skeleton-pill { width: 96px; height: 18px; border-radius: 999px; }
+    @keyframes hf-shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
     .hero-title {
       font-weight: 600;
-      letter-spacing: 0.01em;
-      font-size: calc(var(--vscode-font-size) + 4px);
+      letter-spacing: 0.02em;
+      font-size: calc(var(--vscode-font-size) + 2px);
       line-height: 1.2;
       color: var(--vscode-foreground);
-      margin: 0 0 4px;
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .hero-sub {
-      margin-top: 6px;
-      opacity: 0.92;
+      flex: 1 1 auto;
+      min-width: 0;
+      opacity: 0.85;
       font-size: calc(var(--vscode-font-size) - 1px);
-      line-height: 1.35;
+      line-height: 1.3;
       word-break: break-word;
+      color: var(--vscode-descriptionForeground);
     }
+    .hero-sub:empty { display: none; }
     .watch-panel {
       display: block;
       margin-bottom: 12px;
@@ -309,18 +340,26 @@ function getHtml(
       text-overflow: ellipsis;
       color: var(--vscode-foreground);
     }
-    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      flex: 0 0 auto;
+      justify-content: flex-end;
+    }
+    .pill-row:empty { display: none; }
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 3px 8px;
+      padding: 2px 7px;
       border-radius: 999px;
       font-size: calc(var(--vscode-font-size) - 2px);
       font-weight: 600;
       border: 1px solid color-mix(in srgb, var(--vscode-contrastBorder) 35%, transparent);
       background: color-mix(in srgb, var(--vscode-editorWidget-background) 75%, transparent);
       backdrop-filter: blur(var(--hf-blur));
+      white-space: nowrap;
     }
     .pill.live {
       animation: hf-pulse 1.6s ease-in-out infinite;
@@ -344,10 +383,12 @@ function getHtml(
       box-shadow: 0 2px 10px color-mix(in srgb, var(--vscode-widget-shadow) 25%, transparent);
       transition: border-color 0.15s ease, transform 0.12s ease;
     }
+    .card { cursor: pointer; }
     .card:hover {
       border-color: color-mix(in srgb, var(--vscode-focusBorder) 55%, var(--vscode-widget-border));
       transform: translateY(-1px);
     }
+    .card a.title { cursor: pointer; }
     .pick {
       display: flex;
       align-items: flex-start;
@@ -486,57 +527,54 @@ function getHtml(
         transform: rotate(360deg);
       }
     }
-    .cli-panel {
-      margin-bottom: 12px;
-      padding: 8px 10px;
-      border-radius: var(--hf-radius-sm);
-      border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 72%, transparent);
-      background: color-mix(in srgb, var(--vscode-editorWidget-background) 70%, var(--vscode-sideBar-background));
-      text-align: center;
-    }
-    .panel-caption {
-      font-size: calc(var(--vscode-font-size) - 3px);
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--vscode-descriptionForeground);
-      opacity: 0.85;
-      margin-bottom: 4px;
-    }
-    .cli-row {
+    .toolbar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: center;
-      column-gap: 0;
-      row-gap: 6px;
+      gap: 6px 10px;
+      margin-bottom: 10px;
+      padding: 6px 8px;
+      border-radius: var(--hf-radius-sm);
+      border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 70%, transparent);
+      background: color-mix(in srgb, var(--vscode-editorWidget-background) 70%, var(--vscode-sideBar-background));
       font-size: calc(var(--vscode-font-size) - 1px);
       color: var(--vscode-descriptionForeground);
     }
-    .cli-sep {
-      padding: 0 10px;
-      user-select: none;
-      opacity: 0.55;
-      font-weight: 300;
+    .tb-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
     }
-    /* Hide separator when it wraps to start of a new line (prevents orphan "|"). */
-    .cli-row > .cli-sep:first-child,
-    .cli-row > .cli-sep:last-child {
-      display: none;
+    .tb-label {
+      font-size: calc(var(--vscode-font-size) - 3px);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--vscode-descriptionForeground);
+      opacity: 0.7;
+      padding-right: 2px;
+    }
+    .tb-divider {
+      width: 1px;
+      align-self: stretch;
+      background: color-mix(in srgb, var(--vscode-widget-border) 70%, transparent);
+      margin: 2px 0;
     }
     .cli-select {
-      min-width: 108px;
-      padding: 4px 8px;
-      border-radius: 6px;
+      min-width: 92px;
+      padding: 3px 6px;
+      border-radius: 4px;
       border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 80%, transparent);
       background: var(--vscode-dropdown-background);
       color: var(--vscode-dropdown-foreground);
       font: inherit;
+      font-size: calc(var(--vscode-font-size) - 1px);
     }
     .cli-check {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
@@ -545,18 +583,12 @@ function getHtml(
       cursor: pointer;
       accent-color: var(--vscode-button-background);
     }
-    .filter-row {
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0;
-    }
   </style>
 </head>
 <body data-gh-scheme="${initialGithubScheme}">
   <div class="hero">
-    <div class="hero-inner">
-      <div class="hero-title">Hotfix PRs</div>
-      <div class="hero-sub" id="meta"></div>
+    <div class="hero-row">
+      <div class="hero-sub" id="meta"><span class="skeleton skeleton-meta" aria-label="Loading"></span></div>
       <div class="pill-row" id="pills"></div>
     </div>
   </div>
@@ -577,40 +609,35 @@ function getHtml(
     />
     <span class="search-status" id="searchStatus" aria-live="polite"></span>
   </div>
-  <div class="cli-panel" id="cliPanel">
-    <div class="panel-caption">Hotfix CLI flags</div>
-    <div class="cli-row">
+  <div class="toolbar" id="toolbar" role="toolbar" aria-label="Hotfix controls">
+    <div class="tb-group" aria-label="Hotfix CLI flags">
+      <span class="tb-label">CLI</span>
       <select id="hotfixEnvSel" class="cli-select" aria-label="Environment: pre, prod, or both" title="fcli --env target. Choose 'pre and prod' to run both in sequence (pre first; prod gated on pre success).">
         <option value="pre">pre</option>
         <option value="prod">prod</option>
         <option value="both">pre and prod</option>
       </select>
-      <span class="cli-sep" aria-hidden="true">|</span>
       <label class="cli-check" title="Open the hotfix PR as draft (passes --draft to fcli).">
         <input type="checkbox" id="hotfixDraftCb" aria-label="draft" />
         draft
       </label>
-      <span class="cli-sep" aria-hidden="true">|</span>
       <label class="cli-check" title="Skip E2E in CI for the hotfix (passes --critical-fast-track to fcli).">
         <input type="checkbox" id="hotfixFtCb" aria-label="critical fast track" />
-        critical fast track
+        fast track
       </label>
-      <span class="cli-sep" aria-hidden="true">|</span>
       <label class="cli-check" title="After the created hotfix PR is merged, dispatch the matching workflow(s) in arnac-io/workflows.">
         <input type="checkbox" id="hotfixDeployCb" aria-label="deploy" />
         deploy
       </label>
     </div>
-  </div>
-  <div class="cli-panel" id="filterPanel">
-    <div class="panel-caption">Show</div>
-    <div class="cli-row filter-row">
+    <div class="tb-divider" aria-hidden="true"></div>
+    <div class="tb-group" aria-label="View">
+      <span class="tb-label">View</span>
       <select id="prStatusFilterSel" class="cli-select" aria-label="Filter by PR status">
         <option value="all">All</option>
         <option value="open">Open</option>
         <option value="merged">Merged</option>
       </select>
-      <span class="cli-sep" aria-hidden="true">|</span>
       <select
         id="prSortSel"
         class="cli-select"
@@ -773,11 +800,15 @@ function getHtml(
       }
 
       const parts = [];
-      if (state.login) parts.push("Signed in as <strong>@" + esc(state.login) + "</strong>");
+      if (state.login) parts.push("<strong>@" + esc(state.login) + "</strong>");
       if (!state.login && !state.loadError && !state.listLoading) {
         parts.push('Sign in: run <code>gh auth login</code>, or use <strong>"Hotfix: Set GitHub token"</strong>.');
       }
-      meta.innerHTML = parts.join(" · ") || "Pick PRs below, then Start watching.";
+      if (parts.length === 0 && state.listLoading) {
+        meta.innerHTML = '<span class="skeleton skeleton-meta" aria-label="Loading"></span>';
+      } else {
+        meta.innerHTML = parts.join(" · ");
+      }
 
       const pillHtml = [];
       if (state.deployRunning) {
@@ -865,6 +896,9 @@ function getHtml(
         .join("");
 
       list.querySelectorAll('input[data-role="cb"]').forEach((el) => {
+        el.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+        });
         el.addEventListener("change", (ev) => {
           const t = ev.target;
           const n = Number(t.getAttribute("data-num"));
@@ -874,8 +908,18 @@ function getHtml(
       list.querySelectorAll("a.title").forEach((a) => {
         a.addEventListener("click", (ev) => {
           ev.preventDefault();
+          ev.stopPropagation();
           const url = a.getAttribute("data-url");
           if (url) vscode.postMessage({ command: "open", url });
+        });
+      });
+      list.querySelectorAll(".card").forEach((c) => {
+        c.addEventListener("click", (ev) => {
+          const t = ev.target;
+          if (t.closest && (t.closest("a") || t.closest("input"))) return;
+          const n = Number(c.getAttribute("data-num"));
+          if (!Number.isFinite(n) || n <= 0) return;
+          vscode.postMessage({ command: "toggle", number: n });
         });
       });
     }

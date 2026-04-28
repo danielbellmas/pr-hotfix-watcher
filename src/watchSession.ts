@@ -354,11 +354,6 @@ export class WatchSession {
     });
     const cwd = worktree.path;
     const cmd = buildHotfixCommand(mergedNumbers, ctx.cli, cwd);
-    this.deps.ui.info(
-      `All PRs merged. Running hotfix command for ${mergedNumbers
-        .map((n) => `#${n}`)
-        .join(", ")}…`
-    );
     const runResult = await runHotfixShellCommandAfterMerge({
       command: cmd,
       cwd,

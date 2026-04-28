@@ -236,6 +236,11 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Path to the `gh` executable (e.g. `/opt/homebrew/bin/gh`). Empty searches `PATH` — required on macOS if VS Code/Cursor was not started from a shell."
+        },
+        "fordefiHotfix.worktreePostCreateCommand": {
+          "type": "string",
+          "default": "./atool prepare-codeenv",
+          "markdownDescription": "Shell command run **once**, in the hotfix worktree's cwd, immediately after `git worktree add` succeeds. Skipped on reuse. Default `./atool prepare-codeenv` regenerates the python codeenv so fcli doesn't crash on stale protobufs (e.g. `AttributeError: module ... has no attribute 'BytesEqualsArgumentCondition'`). Empty disables the step. Failures are logged but do not block the run."
         }
       }
     }
