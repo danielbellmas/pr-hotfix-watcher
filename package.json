@@ -1,7 +1,7 @@
 {
   "name": "hotfix-watcher",
   "displayName": "Fordefi Hotfix Watcher",
-  "description": "Watch selected GitHub PRs until merged, then run a configurable hotfix CLI command.",
+  "description": "Watch selected GitHub PRs until merged, run a configurable hotfix CLI, then optionally dispatch the matching pre/prod deploy workflow(s).",
   "version": "0.1.0",
   "publisher": "fordefi",
   "icon": "media/icon.png",
@@ -32,38 +32,43 @@
         {
           "type": "webview",
           "id": "fordefiHotfix.prList",
-          "name": "PR watch",
-          "contextualTitle": "Hotfix PRs"
+          "name": "Hotfix PRs"
         }
       ]
     },
     "commands": [
       {
         "command": "fordefiHotfix.setToken",
-        "title": "Hotfix: Set GitHub token"
+        "category": "Hotfix",
+        "title": "Set GitHub token (PAT override)"
       },
       {
         "command": "fordefiHotfix.clearStoredToken",
-        "title": "Hotfix: Clear stored GitHub token (use gh CLI again)"
+        "category": "Hotfix",
+        "title": "Clear stored GitHub token"
       },
       {
         "command": "fordefiHotfix.refresh",
-        "title": "Refresh",
+        "category": "Hotfix",
+        "title": "Refresh PRs",
         "icon": "$(refresh)"
       },
       {
         "command": "fordefiHotfix.startWatch",
+        "category": "Hotfix",
         "title": "Start watching",
         "icon": "$(run)"
       },
       {
         "command": "fordefiHotfix.stopWatch",
+        "category": "Hotfix",
         "title": "Stop watching",
         "icon": "$(debug-stop)"
       },
       {
         "command": "fordefiHotfix.syncRepoFromGit",
-        "title": "Hotfix: Set owner/repo from git remote"
+        "category": "Hotfix",
+        "title": "Set owner/repo from git remote"
       }
     ],
     "menus": {
@@ -105,7 +110,7 @@
         "fordefiHotfix.owner": {
           "type": "string",
           "default": "arnac-io",
-          "description": "GitHub repository owner for PR search and API."
+          "description": "GitHub repository owner used for PR search and API calls."
         },
         "fordefiHotfix.repo": {
           "type": "string",
@@ -129,12 +134,17 @@
         "fordefiHotfix.repoRoot": {
           "type": "string",
           "default": "",
-          "description": "Absolute path to the git clone where ./fcli lives. Empty uses the first workspace folder."
+          "markdownDescription": "Absolute path to the git clone where the wrapper script your `commandTemplate` invokes (e.g. `./fcli`) lives. Empty falls back to the first workspace folder."
+        },
+        "fordefiHotfix.worktreeSshKey": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional path to an SSH private key used **only inside the hotfix worktree** (e.g. `~/.ssh/id_ed25519_sk_notouch`). Empty leaves git/ssh untouched. When set, the extension scopes `core.sshCommand` to the worktree via `extensions.worktreeConfig` + `git config --worktree` so `git pull/fetch/push` inside `<repoRoot>-hotfix-worktree` skips the YubiKey tap, while the parent repo and any other clone keep using their normal (touch-required) key. Typical use: generate a no-touch FIDO key (`ssh-keygen -t ed25519-sk -O no-touch-required -f ~/.ssh/id_ed25519_sk_notouch`) and add it as a deploy/login key on GitHub."
         },
         "fordefiHotfix.commandTemplate": {
           "type": "string",
           "default": "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
-          "description": "Shell command after all selected PRs merge. Must include {prNumbers}. Placeholders: {repoRoot}, {prNumbers}, {prList}, {owner}, {repo}, {hotfixSuffix} (from Hotfix CLI row / settings)."
+          "markdownDescription": "Shell command run after every selected PR is merged. Must include `{prNumbers}`.\n\nPlaceholders:\n- `{repoRoot}` — value of **Repo root**\n- `{prNumbers}` — space-separated PR numbers, ascending\n- `{prList}` — comma-separated PR numbers\n- `{owner}` / `{repo}` — from **Owner** / **Repo**\n- `{hotfixSuffix}` — fcli flags built from the **Hotfix CLI** row (env, draft, critical fast track)"
         },
         "fordefiHotfix.hotfixRunMode": {
           "type": "string",
@@ -143,12 +153,12 @@
             "background"
           ],
           "default": "integratedTerminal",
-          "description": "How to run the hotfix command after merges. **integratedTerminal** — real terminal so you can touch a YubiKey and answer prompts (e.g. press y); success/failure toasts use shell integration when available. **background** — run via extension host (no TTY); good only for fully non-interactive scripts."
+          "markdownDescription": "How to run the hotfix command after merges.\n\n- **integratedTerminal** — real terminal so you can touch a YubiKey and answer prompts (e.g. press `y`); success/failure toasts use shell integration when available.\n- **background** — run via the extension host (no TTY); only suitable for fully non-interactive scripts."
         },
         "fordefiHotfix.hotfixTerminalName": {
           "type": "string",
           "default": "Hotfix CLI",
-          "description": "Integrated terminal tab name when **Hotfix: Run mode** is `integratedTerminal`."
+          "markdownDescription": "Integrated terminal tab name when **Run mode** is `integratedTerminal`."
         },
         "fordefiHotfix.hotfixEnv": {
           "type": "string",
@@ -158,22 +168,22 @@
             "both"
           ],
           "default": "pre",
-          "description": "Default `--env` for `./fcli workflows hotfix create-pull-request`. Use **both** for `--env pre --env prod` (fcli accepts repeated `-e`)."
+          "markdownDescription": "Default value for the **env** dropdown in the Hotfix CLI row. Forwarded to fcli as `--env`. Choose **both** to pass `--env pre --env prod` (fcli accepts repeated `-e`)."
         },
         "fordefiHotfix.hotfixDraft": {
           "type": "boolean",
           "default": false,
-          "description": "Default: pass `--draft` for a draft hotfix PR (fcli default is --no-draft)."
+          "markdownDescription": "Default state of the **draft** checkbox. When on, passes `--draft` to fcli (fcli default: `--no-draft`)."
         },
         "fordefiHotfix.hotfixCriticalFastTrack": {
           "type": "boolean",
           "default": false,
-          "description": "Default: pass `--critical-fast-track` (skip E2E in CI per fcli help)."
+          "markdownDescription": "Default state of the **critical fast track** checkbox. When on, passes `--critical-fast-track` to fcli (skips E2E in CI per fcli help)."
         },
         "fordefiHotfix.hotfixDeploy": {
           "type": "boolean",
           "default": false,
-          "description": "Default value for the **deploy** checkbox. When on, after the fcli-created hotfix PR is merged the extension dispatches the matching workflow(s) in arnac-io/workflows (pre-hotfix.yml, production-hotfix.yml, or pre → wait for success → prod)."
+          "markdownDescription": "Default state of the **deploy** checkbox. When on, after the fcli-created hotfix PR is merged the extension dispatches the matching workflow(s) in `arnac-io/workflows` (`pre-hotfix.yml`, `production-hotfix.yml`, or pre → wait for success → prod)."
         },
         "fordefiHotfix.workflowsOwner": {
           "type": "string",
@@ -183,7 +193,7 @@
         "fordefiHotfix.workflowsRepo": {
           "type": "string",
           "default": "workflows",
-          "description": "Repository name that hosts the hotfix GitHub Actions workflows (dispatched via `gh workflow run`)."
+          "markdownDescription": "Repository that hosts the hotfix GitHub Actions workflows (dispatched via `gh workflow run`)."
         },
         "fordefiHotfix.preHotfixWorkflow": {
           "type": "string",
@@ -198,34 +208,34 @@
         "fordefiHotfix.workflowRef": {
           "type": "string",
           "default": "main",
-          "description": "Git ref passed to `gh workflow run --ref` when dispatching hotfix workflows."
+          "markdownDescription": "Git ref passed to `gh workflow run --ref` when dispatching hotfix workflows."
         },
         "fordefiHotfix.hotfixTerminalAutoFirstConfirm": {
           "type": "boolean",
           "default": true,
-          "description": "Integrated terminal only: after the hotfix command starts (shell integration), send **Hotfix: Auto first confirm text** once after the delay. Use this when fcli has no `--yes` but still asks for the first `y` / confirmation; YubiKey prompts per environment are unchanged. Best-effort — turn off if it double-submits or fires too early."
+          "markdownDescription": "Integrated terminal only: after the hotfix command starts (shell integration), send **Auto first confirm text** once after the configured delay. Useful when fcli has no `--yes` but still asks for the first `y`/confirmation; per-environment YubiKey prompts are unaffected. Best-effort — turn off if it double-submits or fires too early."
         },
         "fordefiHotfix.hotfixTerminalAutoFirstConfirmText": {
           "type": "string",
           "default": "y",
-          "description": "Keystrokes sent for the first prompt (e.g. `y` or `yes`). If the value has no line breaks, Enter is appended automatically."
+          "markdownDescription": "Keystrokes sent for the first prompt (e.g. `y` or `yes`). If the value contains no line break, Enter is appended automatically."
         },
         "fordefiHotfix.hotfixTerminalAutoFirstConfirmDelayMs": {
           "type": "number",
           "default": 600,
           "minimum": 100,
           "maximum": 30000,
-          "description": "Wait this many milliseconds after the command starts before sending **Hotfix: Auto first confirm text**. Increase if the prompt appears late."
+          "markdownDescription": "Milliseconds to wait after the command starts before sending **Auto first confirm text**. Increase if the prompt appears late."
         },
         "fordefiHotfix.githubPat": {
           "type": "string",
           "default": "",
-          "description": "Optional PAT override only if `gh auth token` is unavailable. Prefer `gh auth login`."
+          "markdownDescription": "Optional PAT override, only useful when `gh auth token` is unavailable. Prefer `gh auth login`."
         },
         "fordefiHotfix.ghPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the `gh` executable (e.g. /opt/homebrew/bin/gh). Empty searches PATH — required on macOS if VS Code was not started from a shell."
+          "markdownDescription": "Path to the `gh` executable (e.g. `/opt/homebrew/bin/gh`). Empty searches `PATH` — required on macOS if VS Code/Cursor was not started from a shell."
         }
       }
     }

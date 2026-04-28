@@ -101,12 +101,12 @@ Choices persist in **`fordefiHotfix.prListView`** (workspace state).
 sequenceDiagram
   participant U as User
   participant W as Webview
-  participant P as PrTreeProvider
+  participant P as PrTreeProvider / WatchSession
   participant GH as GitHub
-  participant S as Shell spawn
+  participant T as Integrated terminal / spawn
   participant O as Output channel
 
-  U->>W: Check PRs → command Start watch
+  U->>W: Check PRs → Start watching
   W->>P: startWatch()
   P->>P: watchTarget, watchEntries, interval poll
   loop Each poll interval
@@ -120,11 +120,11 @@ sequenceDiagram
     else 404
       P-->>U: Error, stop watch
     else Transient error
-      P-->>U: Error toast, keep watching
+      P-->>U: Status updates; toast throttled
     else All merged_at set
-      P->>P: stopWatch, buildHotfixCommand
-      P->>S: spawn shell command cwd=repoRoot
-      S->>O: stream stdout/stderr
+      P->>P: ensureHotfixWorktree, buildHotfixCommand
+      P->>T: run command (mode = integratedTerminal | background)
+      T->>O: stream stdout/stderr
       alt Exit 0
         P-->>U: Information: success for #…
       else Non-zero or signal
@@ -134,7 +134,12 @@ sequenceDiagram
   end
 ```
 
-**Important:** the post-merge command runs in the extension host via **`child_process.spawn`**, not by typing into a visible terminal, so the extension can read **exit code** and notify. Full logs: **View → Output → “Fordefi Hotfix CLI”**.
+**Run mode** (`fordefiHotfix.hotfixRunMode`) decides where the post-merge command executes:
+
+- **`integratedTerminal`** (default): a real terminal so YubiKey / `[y/n]` prompts work; toasts use shell integration to read the exit code when available.
+- **`background`**: `child_process.spawn` in the extension host; no TTY, suitable only for fully non-interactive scripts.
+
+Full logs: **View → Output → "Fordefi Hotfix CLI"** (and **"Fordefi Hotfix Deploy"** when the deploy phase runs).
 
 ---
 

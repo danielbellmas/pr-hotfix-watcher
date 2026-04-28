@@ -5,7 +5,6 @@ import {
   expect,
   it,
   vi,
-  type MockInstance,
 } from "vitest";
 
 vi.mock("vscode", async () => {
@@ -247,10 +246,6 @@ describe("PrTreeProvider integration", () => {
     const deploy = deferred<{ exitCode: number; ok: boolean }>();
     mockedRunDeploy.mockImplementation(async () => deploy.promise);
 
-    const consoleInfoSpy: MockInstance = vi
-      .spyOn(console, "info")
-      .mockImplementation(() => undefined);
-
     const provider = new PrTreeProvider(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(100, true);
@@ -261,13 +256,17 @@ describe("PrTreeProvider integration", () => {
     });
     const statusBefore = provider.getStatusMessage();
 
+    const infoCallsBefore = getFakes().info.mock.calls.length;
     provider.stopWatch();
     expect(provider.getViewState().deployRunning).toBe(true);
     expect(provider.getWatching()).toBe(true);
     expect(provider.getStatusMessage()).toBe(statusBefore);
-    expect(consoleInfoSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Stop pressed during deploy phase")
-    );
+    const newInfoCalls = getFakes()
+      .info.mock.calls.slice(infoCallsBefore)
+      .map((c) => String(c[0]));
+    expect(
+      newInfoCalls.some((m) => /Stop ignored.*deploy/i.test(m))
+    ).toBe(true);
 
     deploy.resolve({ exitCode: 0, ok: true });
     await waitFor(() => provider.getWatching() === false);

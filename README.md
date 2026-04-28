@@ -1,10 +1,10 @@
-# Fordefi Hotfix Watcher (VS Code)
+# Fordefi Hotfix Watcher (VS Code / Cursor)
 
-Sidebar view that lists **your** recent pull requests in a GitHub repo, lets you **checkbox-select** several, **polls until all are merged**, then runs a **configurable shell command** once (defaults to `./fcli workflows hotfix create-pull-request …`).
+Sidebar view that lists **your** recent pull requests in a GitHub repo, lets you **checkbox-select** several, **polls until all are merged**, then runs a **configurable shell command** once (defaults to `./fcli workflows hotfix create-pull-request …`). When the **deploy** toggle is on it also watches the resulting hotfix PR and dispatches the matching pre / prod workflow(s) — including a chained pre → wait-for-success → prod sequence when you pick **both**.
 
 ## Requirements
 
-- VS Code **1.85+** (tree checkboxes).
+- VS Code **1.94+** (or a recent Cursor build).
 - A GitHub token with access to the target repo (`repo` scope for private repositories).
 - A local clone of the monorepo where [`fcli`](https://github.com/arnac-io/arnac) (or your wrapper) exists; set **Repo root** to that directory.
 
@@ -27,16 +27,30 @@ Sidebar view that lists **your** recent pull requests in a GitHub repo, lets you
 
 ## Settings
 
-| ID | Default | Description |
-|----|---------|-------------|
-| `fordefiHotfix.owner` | `arnac-io` | GitHub owner |
-| `fordefiHotfix.repo` | `arnac` | GitHub repo name |
+All settings live under **Hotfix** in `Settings → Extensions → Fordefi Hotfix`. Highlights:
+
+| ID | Default | Purpose |
+|----|---------|---------|
+| `fordefiHotfix.owner` / `.repo` | `arnac-io` / `arnac` | Target GitHub repo |
 | `fordefiHotfix.recentPrCount` | `20` | Latest PRs by update time (max 100) |
 | `fordefiHotfix.pollIntervalSeconds` | `60` | Merge poll interval while watching |
 | `fordefiHotfix.repoRoot` | `""` | Clone path (empty = first workspace folder) |
-| `fordefiHotfix.commandTemplate` | see `package.json` | Must contain `{prNumbers}`. Also: `{repoRoot}`, `{prList}`, `{owner}`, `{repo}` |
-| `fordefiHotfix.githubPat` | `""` | Optional PAT if `gh` is not used |
-| `fordefiHotfix.ghPath` | `""` | Full path to `gh` if VS Code’s `PATH` does not include it (common on macOS when Code is opened from the Dock) |
+| `fordefiHotfix.commandTemplate` | see `package.json` | Must contain `{prNumbers}`. Also: `{repoRoot}`, `{prList}`, `{owner}`, `{repo}`, `{hotfixSuffix}` |
+| `fordefiHotfix.hotfixRunMode` | `integratedTerminal` | `integratedTerminal` (YubiKey-friendly) or `background` |
+| `fordefiHotfix.hotfixTerminalName` | `Hotfix CLI` | Terminal tab name in `integratedTerminal` mode |
+| `fordefiHotfix.hotfixEnv` | `pre` | Default for the **env** dropdown (`pre`, `prod`, `both`) |
+| `fordefiHotfix.hotfixDraft` | `false` | Default for the **draft** checkbox |
+| `fordefiHotfix.hotfixCriticalFastTrack` | `false` | Default for the **critical fast track** checkbox |
+| `fordefiHotfix.hotfixDeploy` | `false` | Default for the **deploy** checkbox (post-merge workflow dispatch) |
+| `fordefiHotfix.workflowsOwner` / `.workflowsRepo` | `arnac-io` / `workflows` | Repo that hosts the deploy workflows |
+| `fordefiHotfix.preHotfixWorkflow` | `pre-hotfix.yml` | Workflow file dispatched for `--env pre` |
+| `fordefiHotfix.productionHotfixWorkflow` | `production-hotfix.yml` | Workflow file dispatched for `--env prod` |
+| `fordefiHotfix.workflowRef` | `main` | `gh workflow run --ref` value |
+| `fordefiHotfix.hotfixTerminalAutoFirstConfirm` | `true` | Auto-send the first prompt confirmation in `integratedTerminal` mode |
+| `fordefiHotfix.hotfixTerminalAutoFirstConfirmText` | `y` | Keystrokes for that first prompt |
+| `fordefiHotfix.hotfixTerminalAutoFirstConfirmDelayMs` | `600` | Delay before sending it |
+| `fordefiHotfix.githubPat` | `""` | Optional PAT override (prefer `gh auth login`) |
+| `fordefiHotfix.ghPath` | `""` | Full path to `gh` when `PATH` doesn't include it (common on macOS when VS Code/Cursor is opened from the Dock) |
 
 Token resolution order: **`gh auth token`** (see `fordefiHotfix.ghPath`) → **Secret Storage** (“Hotfix: Set GitHub token”) → `fordefiHotfix.githubPat` → process env `GITHUB_ACCESS_TOKEN`.
 
@@ -161,7 +175,7 @@ npx vsce package
 npx ovsx publish *.vsix --pat $OPENVSX_TOKEN
 ```
 
-Use your own `publisher` in `package.json` before publishing to the Marketplace or Open VSX. The Marketplace expects a **128×128 PNG** icon; this repo ships `media/icon.svg` for branding only (omit `icon` in `package.json` until you add a PNG).
+Use your own `publisher` in `package.json` before publishing to the Marketplace or Open VSX. The Marketplace expects a **128×128 PNG** icon; this repo ships `media/icon.png` (referenced from `package.json`) plus the activity-bar `media/hotfix.svg`.
 
 ## CI
 

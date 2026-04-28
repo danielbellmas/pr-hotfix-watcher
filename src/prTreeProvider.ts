@@ -365,7 +365,7 @@ export class PrTreeProvider {
       const token = await resolveGitHubToken(this.context);
       if (!token) {
         this.loadError =
-          "No GitHub token. Run command “Hotfix: Set GitHub token”.";
+          "No GitHub token. Run `gh auth login` in a terminal, or use \"Hotfix: Set GitHub token\" for a PAT override.";
         this.rows = [];
         return;
       }
@@ -439,13 +439,13 @@ export class PrTreeProvider {
 
   startWatch(): void {
     if (this.watchSession.isWatching()) {
-      void vscode.window.showWarningMessage("Already watching.");
+      void vscode.window.showWarningMessage("Already watching a hotfix batch.");
       return;
     }
     const nums = this.getSelectedNumbers();
     if (nums.length === 0) {
       void vscode.window.showWarningMessage(
-        "Select at least one PR (checkbox) to watch."
+        "Select at least one PR to watch."
       );
       return;
     }

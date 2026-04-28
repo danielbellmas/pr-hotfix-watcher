@@ -6,6 +6,7 @@ import {
   getRepoConfig,
   getRepoRoot,
   getWorkflowsRepoConfig,
+  getWorktreeSshKey,
 } from "./config";
 import {
   describeDeployOutcome,
@@ -90,6 +91,11 @@ type DeployPhase = {
   abort: { aborted: boolean };
 };
 
+/** Toast at most once per N consecutive transient poll errors so a flaky network
+ *  doesn't spam the user. The status line in the live-watch banner still
+ *  updates every poll. */
+const POLL_ERROR_TOAST_EVERY = 5;
+
 export class WatchSession {
   private watching = false;
   private watchTarget: number[] = [];
@@ -104,6 +110,7 @@ export class WatchSession {
   private deployPhase: DeployPhase | null = null;
   private statusMessage = "";
   private lastDeployRunningContext = false;
+  private consecutivePollErrors = 0;
 
   constructor(private readonly deps: WatchSessionDeps) {}
 
@@ -140,8 +147,8 @@ export class WatchSession {
    *  and there's nothing useful to cancel. */
   stop(): void {
     if (this.deployRunning) {
-      console.info(
-        "[fordefi-hotfix] Stop pressed during deploy phase — letting dispatched workflow finish."
+      this.deps.ui.info(
+        "Stop ignored: a hotfix deploy workflow is already dispatched on GitHub."
       );
       return;
     }
@@ -187,7 +194,7 @@ export class WatchSession {
           },
         ],
         statusLine: this.statusMessage,
-        hotfixSummary: `Waiting on hotfix PR #${d.prNumber} to merge → then deploy ${cli.env}`,
+        hotfixSummary: `Waiting on hotfix PR #${d.prNumber} to merge → then deploy ${describeEnvShort(cli.env)}`,
       };
     }
     if (this.watchTarget.length === 0) {
@@ -231,7 +238,9 @@ export class WatchSession {
       const token = await this.deps.resolveToken();
       if (!token) {
         this.stop();
-        this.deps.ui.error("GitHub token missing; stopped watch.");
+        this.deps.ui.error(
+          "GitHub token missing — stopped watching. Run `gh auth login` and try again."
+        );
         return;
       }
       const { owner, repo } = getRepoConfig();
@@ -266,9 +275,16 @@ export class WatchSession {
           return;
         }
         if (phase.kind === "poll_error") {
-          this.deps.ui.error(`Hotfix watch poll failed: ${phase.message}`);
+          this.consecutivePollErrors++;
+          this.statusMessage = `Hotfix watch poll failed — retrying… (${phase.message})`;
+          this.deps.onChange();
+          if (this.consecutivePollErrors === 1 ||
+              this.consecutivePollErrors % POLL_ERROR_TOAST_EVERY === 0) {
+            this.deps.ui.error(`Hotfix watch poll failed: ${phase.message}`);
+          }
           return;
         }
+        this.consecutivePollErrors = 0;
         if (phase.kind === "stop_closed") {
           this.stop();
           const nums = phase.prNumbers.join(", #");
@@ -290,7 +306,11 @@ export class WatchSession {
         await this.handleAllMerged();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        this.deps.ui.error(`Hotfix watch poll failed: ${msg}`);
+        this.consecutivePollErrors++;
+        if (this.consecutivePollErrors === 1 ||
+            this.consecutivePollErrors % POLL_ERROR_TOAST_EVERY === 0) {
+          this.deps.ui.error(`Hotfix watch poll failed: ${msg}`);
+        }
       }
     });
   }
@@ -323,11 +343,13 @@ export class WatchSession {
       this.watching = false;
       this.deps.onChange();
       this.deps.ui.error(
-        "fordefiHotfix.repoRoot is empty and no workspace folder — set repo root in settings."
+        "No repo root configured. Set Hotfix › Repo root in settings, or open a workspace folder."
       );
       return;
     }
-    const worktree = await ensureHotfixWorktree(baseRoot);
+    const worktree = await ensureHotfixWorktree(baseRoot, undefined, {
+      sshKeyPath: getWorktreeSshKey(),
+    });
     const cwd = worktree.path;
     const cmd = buildHotfixCommand(mergedNumbers, ctx.cli, cwd);
     this.deps.ui.info(
@@ -428,10 +450,14 @@ export class WatchSession {
           },
           onDeployDispatchStart: (dispatchEnv) => {
             this.deployRunning = true;
-            this.statusMessage = `Hotfix PR merged. Dispatching ${dispatchEnv} workflow(s) — Stop is disabled once dispatched.`;
+            this.statusMessage = `Hotfix PR merged. Dispatching ${describeEnvShort(
+              dispatchEnv
+            )} workflow(s). Stop is disabled while a run is in flight.`;
             this.deps.onChange();
             this.deps.ui.info(
-              `Hotfix PR merged. Dispatching ${describeEnv(dispatchEnv)}…`
+              `Hotfix PR merged. Dispatching ${describeEnvShort(
+                dispatchEnv
+              )} workflow(s)…`
             );
           },
           onDeployDispatchEnd: () => {
@@ -473,14 +499,17 @@ function formatHotfixWatchSummary(cli: HotfixCliOptions): string {
     ? `When every PR is merged → run your command with ${flags}`
     : "When every PR is merged → run your command (no extra hotfix flags)";
   return cli.deploy
-    ? `${base}, then watch the hotfix PR and deploy ${describeEnv(cli.env)}`
+    ? `${base}, then watch the hotfix PR and deploy ${describeEnvShort(cli.env)}`
     : base;
 }
 
-function describeEnv(env: HotfixCliOptions["env"]): string {
-  if (env === "pre") return "pre-hotfix.yml";
-  if (env === "prod") return "production-hotfix.yml";
-  return "pre-hotfix.yml → production-hotfix.yml";
+/** User-facing label for an env. Returns short names ("pre", "prod",
+ *  "pre → prod") rather than workflow filenames. The filename leak used to
+ *  confuse non-developers reading the live-watch banner. */
+function describeEnvShort(env: HotfixCliOptions["env"]): string {
+  if (env === "pre") return "pre";
+  if (env === "prod") return "prod";
+  return "pre → prod";
 }
 
 /** Default UI sink wired to `vscode.window.*` + `setContext`. */
@@ -505,13 +534,13 @@ async function askForHotfixPrUrl(fallback: {
 }): Promise<string | undefined> {
   const answer = await vscode.window.showInputBox({
     title: "Hotfix PR URL (for deploy)",
-    prompt: `fcli did not emit HOTFIX_PR_URL=... Paste the created hotfix PR URL in ${fallback.owner}/${fallback.repo} to continue the deploy, or press Esc to cancel.`,
+    prompt: `fcli did not emit a hotfix PR URL. Paste the created hotfix PR URL in ${fallback.owner}/${fallback.repo} to continue the deploy, or press Esc to cancel.`,
     placeHolder: `https://github.com/${fallback.owner}/${fallback.repo}/pull/123`,
     ignoreFocusOut: true,
     validateInput: (value) => {
       const v = value.trim();
-      if (!v) return "Enter a GitHub PR URL";
-      return parseGithubPullUrl(v) ? null : "Not a recognized GitHub PR URL";
+      if (!v) return "Enter a GitHub PR URL.";
+      return parseGithubPullUrl(v) ? null : "Not a recognized GitHub PR URL.";
     },
   });
   return answer;

@@ -57,12 +57,12 @@ function notifySpawnClose(
 ): void {
   ch.appendLine("");
   if (signal) {
-    ch.appendLine(`[finished] signal ${signal}`);
+    ch.appendLine(`[hotfix-cli finished] signal ${signal}`);
     void vscode.window
       .showWarningMessage(
         `Hotfix CLI stopped (signal ${String(
           signal
-        )}) for ${prs}. See output “${OUTPUT_TITLE}”.`,
+        )}) for ${prs}. See output "${OUTPUT_TITLE}".`,
         "Open output"
       )
       .then((sel) => {
@@ -71,18 +71,18 @@ function notifySpawnClose(
         }
       });
   } else if (code === 0) {
-    ch.appendLine("[finished] exit 0");
+    ch.appendLine("[hotfix-cli finished] exit 0");
     void vscode.window.showInformationMessage(
       `Hotfix CLI finished successfully for ${prs}.`
     );
   } else {
-    ch.appendLine(`[finished] exit ${code}`);
+    ch.appendLine(`[hotfix-cli finished] exit ${code}`);
     const snippet = truncateRunLogTail(combined, 280);
     void vscode.window
       .showErrorMessage(
         `Hotfix CLI failed (exit ${code}) for ${prs}.${
-          snippet ? ` ${snippet}` : ""
-        } See output “${OUTPUT_TITLE}”.`,
+          snippet ? ` — ${snippet}` : ""
+        } See output "${OUTPUT_TITLE}".`,
         "Open output"
       )
       .then((sel) => {
@@ -100,10 +100,10 @@ function notifyTerminalEnd(
 ): void {
   ch.appendLine("");
   if (exitCode === undefined) {
-    ch.appendLine("[finished] exit code unknown");
+    ch.appendLine("[hotfix-cli finished] exit code unknown");
     void vscode.window
       .showWarningMessage(
-        `Hotfix CLI finished for ${prs}, but the shell did not report an exit code. Check the terminal output.`,
+        `Hotfix CLI finished for ${prs}, but the shell did not report an exit code. Check the integrated terminal output.`,
         "Open output"
       )
       .then((sel) => {
@@ -112,15 +112,15 @@ function notifyTerminalEnd(
         }
       });
   } else if (exitCode === 0) {
-    ch.appendLine("[finished] exit 0");
+    ch.appendLine("[hotfix-cli finished] exit 0");
     void vscode.window.showInformationMessage(
       `Hotfix CLI finished successfully for ${prs}.`
     );
   } else {
-    ch.appendLine(`[finished] exit ${exitCode}`);
+    ch.appendLine(`[hotfix-cli finished] exit ${exitCode}`);
     void vscode.window
       .showErrorMessage(
-        `Hotfix CLI failed (exit ${exitCode}) for ${prs}. See the integrated terminal and output “${OUTPUT_TITLE}”.`,
+        `Hotfix CLI failed (exit ${exitCode}) for ${prs}. See the integrated terminal and output "${OUTPUT_TITLE}".`,
         "Open output"
       )
       .then((sel) => {
@@ -185,7 +185,7 @@ async function runHotfixIntegratedTerminal(
   });
   if (result.fallbackUsed) {
     void vscode.window.showInformationMessage(
-      `Hotfix command was sent to terminal “${terminalName}” for ${prs}. Complete YubiKey / prompts there — exit code is not available without shell integration.`
+      `Hotfix command sent to terminal "${terminalName}" for ${prs}. Complete YubiKey / prompts there — exit code is unavailable without shell integration.`
     );
   } else {
     notifyTerminalEnd(prs, result.exitCode, ch);

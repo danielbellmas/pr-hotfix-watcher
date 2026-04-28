@@ -513,6 +513,15 @@ function getHtml(
       background: color-mix(in srgb, var(--vscode-editorWidget-background) 70%, var(--vscode-sideBar-background));
       text-align: center;
     }
+    .panel-caption {
+      font-size: calc(var(--vscode-font-size) - 3px);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--vscode-descriptionForeground);
+      opacity: 0.85;
+      margin-bottom: 4px;
+    }
     .cli-row {
       display: flex;
       flex-wrap: wrap;
@@ -581,37 +590,39 @@ function getHtml(
       type="search"
       class="search-input"
       id="search"
-      placeholder="Search by title or #…"
+      placeholder="Search PRs by title or #number…"
       spellcheck="false"
       autocomplete="off"
     />
     <span class="search-status" id="searchStatus" aria-live="polite"></span>
   </div>
   <div class="cli-panel" id="cliPanel">
+    <div class="panel-caption">Hotfix CLI flags</div>
     <div class="cli-row">
-      <select id="hotfixEnvSel" class="cli-select" aria-label="Environment: pre, prod, or both">
+      <select id="hotfixEnvSel" class="cli-select" aria-label="Environment: pre, prod, or both" title="fcli --env target. Choose 'pre and prod' to run both in sequence (pre first; prod gated on pre success).">
         <option value="pre">pre</option>
         <option value="prod">prod</option>
         <option value="both">pre and prod</option>
       </select>
       <span class="cli-sep" aria-hidden="true">|</span>
-      <label class="cli-check">
+      <label class="cli-check" title="Open the hotfix PR as draft (passes --draft to fcli).">
         <input type="checkbox" id="hotfixDraftCb" aria-label="draft" />
         draft
       </label>
       <span class="cli-sep" aria-hidden="true">|</span>
-      <label class="cli-check">
+      <label class="cli-check" title="Skip E2E in CI for the hotfix (passes --critical-fast-track to fcli).">
         <input type="checkbox" id="hotfixFtCb" aria-label="critical fast track" />
         critical fast track
       </label>
       <span class="cli-sep" aria-hidden="true">|</span>
-      <label class="cli-check" title="After the created hotfix PR is merged, dispatch the matching workflow(s) in arnac-io/workflows">
+      <label class="cli-check" title="After the created hotfix PR is merged, dispatch the matching workflow(s) in arnac-io/workflows.">
         <input type="checkbox" id="hotfixDeployCb" aria-label="deploy" />
         deploy
       </label>
     </div>
   </div>
   <div class="cli-panel" id="filterPanel">
+    <div class="panel-caption">Show</div>
     <div class="cli-row filter-row">
       <select id="prStatusFilterSel" class="cli-select" aria-label="Filter by PR status">
         <option value="all">All</option>
@@ -783,9 +794,9 @@ function getHtml(
       const parts = [];
       if (state.login) parts.push("Signed in as <strong>@" + esc(state.login) + "</strong>");
       if (!state.login && !state.loadError && !state.listLoading) {
-        parts.push("Connect GitHub via the token command if needed.");
+        parts.push('Sign in: run <code>gh auth login</code>, or use <strong>"Hotfix: Set GitHub token"</strong>.');
       }
-      meta.innerHTML = parts.join(" · ") || "Ready when you are.";
+      meta.innerHTML = parts.join(" · ") || "Pick PRs below, then Start watching.";
 
       const pillHtml = [];
       if (state.deployRunning) {
@@ -819,7 +830,7 @@ function getHtml(
 
       if (src === 0) {
         list.innerHTML =
-          '<div class="open-hint">No PRs yet. Check your <strong>GitHub token</strong> and <strong>owner/repo</strong> settings, then hit <strong>Refresh</strong>. ✨</div>';
+          '<div class="open-hint">No PRs yet.<br/>Sign in with <code>gh auth login</code>, check <strong>Hotfix › Owner</strong> / <strong>Repo</strong> in settings, then hit <strong>Refresh</strong>.</div>';
         return;
       }
       if (!state.rows.length) {
@@ -830,13 +841,13 @@ function getHtml(
           list.innerHTML =
             '<div class="open-hint">No PRs match <strong>' +
             esc(q) +
-            "</strong>. Try different words — checked PRs still appear when they match your list. ✨</div>";
+            "</strong>. Try different keywords — checked PRs stay visible when they match your list.</div>";
         } else if (statusOnly) {
           list.innerHTML =
-            '<div class="open-hint">No PRs match this <strong>status</strong> filter. Try <strong>All</strong> or pick another option. ✨</div>';
+            '<div class="open-hint">No PRs match this <strong>status</strong> filter. Try <strong>All</strong> or pick another option.</div>';
         } else {
           list.innerHTML =
-            '<div class="open-hint">Nothing to show here. Adjust search or filters — checked PRs stay listed when they are in your refresh set. ✨</div>';
+            '<div class="open-hint">Nothing to show. Adjust search or filters — checked PRs stay listed when they are in your refresh set.</div>';
         }
         return;
       }

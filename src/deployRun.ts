@@ -43,7 +43,7 @@ function appendDeployHeader(
   ch.appendLine("");
   ch.appendLine(`── ${new Date().toISOString()} ──`);
   ch.appendLine(`Deploy env: ${env}`);
-  ch.appendLine(`$ bash -lc '<deploy script>'`);
+  ch.appendLine(`[deploy] script:`);
   ch.appendLine(script);
   ch.appendLine("");
 }
@@ -120,7 +120,7 @@ async function runDeployBackground(
   ch.appendLine(`[deploy finished] exit ${result.exitCode}`);
   void vscode.window
     .showErrorMessage(
-      `Hotfix deploy failed (exit ${result.exitCode}). See output “${DEPLOY_OUTPUT_TITLE}”.`,
+      `Hotfix deploy failed (exit ${result.exitCode}). See output "${DEPLOY_OUTPUT_TITLE}".`,
       "Open output"
     )
     .then((sel) => {
@@ -161,7 +161,7 @@ async function runDeployIntegratedTerminal(
   });
   if (result.fallbackUsed) {
     void vscode.window.showInformationMessage(
-      `Hotfix deploy script was sent to terminal “${DEPLOY_TERMINAL_NAME}”. Exit code is not available without shell integration.`
+      `Hotfix deploy script sent to terminal "${DEPLOY_TERMINAL_NAME}". Exit code is unavailable without shell integration.`
     );
     return { exitCode: result.exitCode, ok: false };
   }
@@ -181,7 +181,7 @@ async function runDeployIntegratedTerminal(
   } else {
     ch.appendLine(`[deploy finished] exit ${result.exitCode}`);
     void vscode.window.showErrorMessage(
-      `Hotfix deploy failed (exit ${result.exitCode}). See terminal “${DEPLOY_TERMINAL_NAME}”.`
+      `Hotfix deploy failed (exit ${result.exitCode}). See terminal "${DEPLOY_TERMINAL_NAME}".`
     );
     pingDeployFinished(
       ch,

@@ -289,7 +289,7 @@ export function describeDeployOutcome(
       return {
         severity: "error",
         message:
-          "GitHub token missing; cannot watch the hotfix PR for deploy.",
+          "GitHub token missing — cannot watch the hotfix PR for deploy. Run `gh auth login` and try again.",
         stopsWatch: true,
         deployEnded: false,
       };

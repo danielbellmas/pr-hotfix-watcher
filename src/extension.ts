@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const token = await vscode.window.showInputBox({
         title: "GitHub personal access token (override)",
         prompt:
-          "Normally the extension uses `gh auth token` (GitHub CLI). Use this only to override — stored in Secret Storage (repo scope for private repos).",
+          "Prefer `gh auth login` so the extension shares a token with the CLI. Use this only as an override; stored in Secret Storage (repo scope for private repos).",
         password: true,
         ignoreFocusOut: true,
       });
@@ -72,7 +72,7 @@ export function activate(context: vscode.ExtensionContext): void {
       async () => {
         await clearStoredGithubToken(context);
         void vscode.window.showInformationMessage(
-          "Stored GitHub token removed. Extension will use `gh auth token` when available."
+          "Stored GitHub token removed. The extension will use `gh auth token` when available."
         );
         await provider.refresh();
       }
@@ -92,21 +92,21 @@ export function activate(context: vscode.ExtensionContext): void {
         const root = getRepoRoot();
         if (!root) {
           void vscode.window.showErrorMessage(
-            "Open a workspace folder or set fordefiHotfix.repoRoot."
+            "Open a workspace folder, or set Hotfix › Repo root in settings."
           );
           return;
         }
         const remote = readOriginRemote(root);
         if (!remote) {
           void vscode.window.showErrorMessage(
-            `Could not read git remote origin under ${root}`
+            `Could not read git remote 'origin' under ${root}.`
           );
           return;
         }
         const parsed = parseGitHubRepoFromRemote(remote);
         if (!parsed) {
           void vscode.window.showErrorMessage(
-            `Unrecognized remote URL: ${remote}`
+            `Unrecognized GitHub remote URL: ${remote}`
           );
           return;
         }
@@ -122,7 +122,7 @@ export function activate(context: vscode.ExtensionContext): void {
           vscode.ConfigurationTarget.Workspace
         );
         void vscode.window.showInformationMessage(
-          `Set repo to ${parsed.owner}/${parsed.repo}`
+          `Hotfix repo set to ${parsed.owner}/${parsed.repo}.`
         );
         await provider.refresh();
       }
