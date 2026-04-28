@@ -3,10 +3,11 @@ import {
   buildHotfixCommand,
   getHotfixPrPollIntervalMs,
   getPollIntervalMs,
+  getGhPath,
   getRepoConfig,
   getRepoRoot,
   getWorkflowsRepoConfig,
-  getWorktreeSshKey,
+  getWorktreePostCreateCommand,
 } from "./config";
 import {
   describeDeployOutcome,
@@ -348,7 +349,8 @@ export class WatchSession {
       return;
     }
     const worktree = await ensureHotfixWorktree(baseRoot, undefined, {
-      sshKeyPath: getWorktreeSshKey(),
+      ghPath: getGhPath(),
+      postCreateCommand: getWorktreePostCreateCommand(),
     });
     const cwd = worktree.path;
     const cmd = buildHotfixCommand(mergedNumbers, ctx.cli, cwd);

@@ -89,6 +89,30 @@ export function getPollIntervalMs(): number {
   return Math.max(5, sec) * 1000;
 }
 
+export function getGhPath(): string {
+  return (
+    vscode.workspace
+      .getConfiguration("fordefiHotfix")
+      .get<string>("ghPath", "")
+      ?.trim() ?? ""
+  );
+}
+
+/**
+ * One-shot shell command run inside the hotfix worktree right after
+ * `git worktree add`. Default `./atool prepare-codeenv` regenerates the python
+ * codeenv so fcli doesn't crash on stale protobufs (e.g.
+ * `BytesEqualsArgumentCondition` missing). Empty disables the step.
+ */
+export function getWorktreePostCreateCommand(): string {
+  return (
+    vscode.workspace
+      .getConfiguration("fordefiHotfix")
+      .get<string>("worktreePostCreateCommand", "./atool prepare-codeenv")
+      ?.trim() ?? ""
+  );
+}
+
 export function getRepoRoot(): string {
   const configured = vscode.workspace
     .getConfiguration("fordefiHotfix")

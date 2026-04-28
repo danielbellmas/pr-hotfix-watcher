@@ -40,6 +40,12 @@ export type ExecResult =
 
 const DEFAULT_BRANCH_FALLBACK = "main";
 const GIT_TIMEOUT_MS = 15_000;
+/**
+ * Long enough for `./atool prepare-codeenv` to finish on a cold cache (docker
+ * image pulls + protobuf codegen). Keeps the watcher blocked once, on the first
+ * worktree creation only.
+ */
+const POST_CREATE_TIMEOUT_MS = 20 * 60 * 1000;
 
 /**
  * Suffix appended to the normalized `repoRoot` to form the dedicated hotfix
@@ -114,6 +120,115 @@ export function computeWorktreePath(repoRoot: string): string {
   return `${normalized}${HOTFIX_WORKTREE_SUFFIX}`;
 }
 
+/**
+ * Per-worktree URL rewrite + credential helper that routes fcli's
+ * `git push/pull/fetch origin` through HTTPS + `gh auth git-credential`,
+ * bypassing the SSH transport (and therefore the YubiKey tap) only inside
+ * the hotfix worktree. Main repo `.git/config` and `~/.gitconfig` are
+ * untouched. Idempotent — `--replace-all` / `--unset-all` keep the file
+ * stable across watcher runs. Failures are logged and swallowed: this is a
+ * convenience layer; if writes fail the worktree just falls back to today's
+ * SSH-with-tap behavior, no regression.
+ */
+export function applyWorktreeHttpsRewrite(
+  repoRoot: string,
+  worktreePath: string,
+  ghPath: string,
+  deps: WorktreeDeps
+): void {
+  const enable = deps.exec(
+    "git",
+    ["-C", repoRoot, "config", "extensions.worktreeConfig", "true"],
+    { cwd: repoRoot }
+  );
+  if (!enable.ok) {
+    deps.log?.(
+      `[worktree] https-rewrite skipped: enable extensions.worktreeConfig failed — ${enable.error.message.trim()}`
+    );
+    return;
+  }
+
+  const insteadOf = deps.exec(
+    "git",
+    [
+      "-C",
+      worktreePath,
+      "config",
+      "--worktree",
+      "--replace-all",
+      "url.https://github.com/.insteadOf",
+      "git@github.com:",
+    ],
+    { cwd: worktreePath }
+  );
+  if (!insteadOf.ok) {
+    deps.log?.(
+      `[worktree] https-rewrite skipped: set insteadOf failed — ${insteadOf.error.message.trim()}`
+    );
+    return;
+  }
+
+  // The empty helper resets any inherited chain (osxkeychain etc.) so the
+  // worktree gets a deterministic gh-only credential lookup.
+  deps.exec(
+    "git",
+    [
+      "-C",
+      worktreePath,
+      "config",
+      "--worktree",
+      "--unset-all",
+      "credential.https://github.com.helper",
+    ],
+    { cwd: worktreePath }
+  );
+
+  const resolvedGh = ghPath.trim() || "gh";
+  const helperCmd = `!${resolvedGh} auth git-credential`;
+  const addEmpty = deps.exec(
+    "git",
+    [
+      "-C",
+      worktreePath,
+      "config",
+      "--worktree",
+      "--add",
+      "credential.https://github.com.helper",
+      "",
+    ],
+    { cwd: worktreePath }
+  );
+  if (!addEmpty.ok) {
+    deps.log?.(
+      `[worktree] https-rewrite partial: add empty helper failed — ${addEmpty.error.message.trim()}`
+    );
+    return;
+  }
+  const addGh = deps.exec(
+    "git",
+    [
+      "-C",
+      worktreePath,
+      "config",
+      "--worktree",
+      "--add",
+      "credential.https://github.com.helper",
+      helperCmd,
+    ],
+    { cwd: worktreePath }
+  );
+  if (!addGh.ok) {
+    deps.log?.(
+      `[worktree] https-rewrite partial: add gh helper failed — ${addGh.error.message.trim()}`
+    );
+    return;
+  }
+
+  deps.log?.(
+    `[worktree] https-rewrite applied: insteadOf git@github.com: → https://github.com/, credential helper "${helperCmd}"`
+  );
+}
+
 function isInsideWorkTree(wtPath: string, deps: WorktreeDeps): boolean {
   const res = deps.exec(
     "git",
@@ -166,9 +281,25 @@ function buildFallback(
  * unrecoverable failure returns a fallback pointing at the original `repoRoot`
  * so the run still proceeds instead of blocking the user.
  */
+export type EnsureHotfixWorktreeOptions = {
+  /** Path to `gh` for the per-worktree credential helper. Empty → falls back to "gh" on PATH. */
+  ghPath?: string;
+  /**
+   * Shell command run **once**, in the worktree's cwd, immediately after a
+   * successful `git worktree add`. Skipped on reuse. Empty / undefined → no-op.
+   *
+   * Intended for one-shot environment bootstrap (e.g. `./atool prepare-codeenv`)
+   * so subsequent fcli runs don't hit stale protobuf / venv state. Failures are
+   * logged and swallowed: the worktree is still considered created so the run
+   * proceeds, and the user can re-run the command manually if needed.
+   */
+  postCreateCommand?: string;
+};
+
 export async function ensureHotfixWorktree(
   repoRoot: string,
-  deps: WorktreeDeps = createDefaultWorktreeDeps()
+  deps: WorktreeDeps = createDefaultWorktreeDeps(),
+  options?: EnsureHotfixWorktreeOptions
 ): Promise<EnsureHotfixWorktreeResult> {
   if (!repoRoot || !repoRoot.trim()) {
     return buildFallback(repoRoot, "empty-root", "repoRoot is empty", deps);
@@ -197,6 +328,7 @@ export async function ensureHotfixWorktree(
 
   if (deps.existsSync(wtPath) && isInsideWorkTree(wtPath, deps)) {
     deps.log?.(`[worktree] reuse: ${wtPath}`);
+    applyWorktreeHttpsRewrite(repoRoot, wtPath, options?.ghPath ?? "", deps);
     return { path: wtPath, created: false };
   }
 
@@ -241,5 +373,38 @@ export async function ensureHotfixWorktree(
   deps.log?.(
     `[worktree] created: ${wtPath} (branch ${HOTFIX_WORKTREE_BRANCH} @ origin/${branch})`
   );
+  applyWorktreeHttpsRewrite(repoRoot, wtPath, options?.ghPath ?? "", deps);
+  runPostCreateCommand(wtPath, options?.postCreateCommand, deps);
   return { path: wtPath, created: true };
+}
+
+/**
+ * Run a one-shot shell command inside the freshly-created worktree. Routed
+ * through `sh -c` so the configured value can be a small pipeline / cd-prefix
+ * if needed. Best-effort: any failure is logged and ignored so the watcher's
+ * higher-level flow keeps running.
+ */
+function runPostCreateCommand(
+  wtPath: string,
+  command: string | undefined,
+  deps: WorktreeDeps
+): void {
+  const cmd = command?.trim();
+  if (!cmd) {
+    return;
+  }
+  deps.log?.(
+    `[worktree] post-create: running "${cmd}" in ${wtPath} (one-shot, may take a few minutes)`
+  );
+  const res = deps.exec("sh", ["-c", cmd], {
+    cwd: wtPath,
+    timeoutMs: POST_CREATE_TIMEOUT_MS,
+  });
+  if (!res.ok) {
+    deps.log?.(
+      `[worktree] post-create failed (continuing): ${res.error.message.trim()}`
+    );
+    return;
+  }
+  deps.log?.(`[worktree] post-create completed: "${cmd}"`);
 }

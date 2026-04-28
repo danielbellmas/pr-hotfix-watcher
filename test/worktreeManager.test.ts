@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  applyWorktreeHttpsRewrite,
   computeWorktreePath,
   ensureHotfixWorktree,
   HOTFIX_WORKTREE_BRANCH,
@@ -309,5 +310,285 @@ describe("ensureHotfixWorktree", () => {
     expect(res.fallback).toBe("add-failed");
     expect(res.path).toBe("/Users/me/go/src/arnac");
     expect(res.fallbackDetail).toMatch(/mkdir/);
+  });
+
+  it("applies the per-worktree https-rewrite + gh credential helper after creating a fresh worktree", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const wt = "/Users/me/go/src/arnac-hotfix-worktree";
+    const { deps, calls } = makeDeps({
+      responder: (call) => {
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
+          return ok("origin/main\n");
+        }
+        return undefined;
+      },
+    });
+
+    const res = await ensureHotfixWorktree(repoRoot, deps, {
+      ghPath: "/opt/homebrew/bin/gh",
+    });
+    expect(res.created).toBe(true);
+
+    const enable = calls.filter(
+      (c) =>
+        c.args.includes("config") &&
+        c.args.includes("extensions.worktreeConfig")
+    );
+    expect(enable).toHaveLength(1);
+
+    const insteadOf = calls.filter((c) =>
+      c.args.includes("url.https://github.com/.insteadOf")
+    );
+    expect(insteadOf).toHaveLength(1);
+    expect(insteadOf[0].args).toEqual([
+      "-C",
+      wt,
+      "config",
+      "--worktree",
+      "--replace-all",
+      "url.https://github.com/.insteadOf",
+      "git@github.com:",
+    ]);
+
+    const helperCalls = calls.filter((c) =>
+      c.args.includes("credential.https://github.com.helper")
+    );
+    expect(helperCalls.map((c) => c.args.at(-1))).toEqual([
+      "credential.https://github.com.helper",
+      "",
+      "!/opt/homebrew/bin/gh auth git-credential",
+    ]);
+    expect(helperCalls[0].args).toContain("--unset-all");
+    expect(helperCalls[1].args).toContain("--add");
+    expect(helperCalls[2].args).toContain("--add");
+  });
+
+  it("re-applies the rewrite on reuse so existing worktrees pick up changes", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const wt = "/Users/me/go/src/arnac-hotfix-worktree";
+    const { deps, calls } = makeDeps({
+      existing: new Set([wt]),
+      responder: (call) => {
+        if (call.args.includes("--is-inside-work-tree")) {
+          return ok("true\n");
+        }
+        return undefined;
+      },
+    });
+
+    const res = await ensureHotfixWorktree(repoRoot, deps, { ghPath: "" });
+    expect(res.created).toBe(false);
+    expect(
+      calls.filter((c) => c.args.includes("url.https://github.com/.insteadOf"))
+    ).toHaveLength(1);
+  });
+
+  it("falls back to literal `gh` when ghPath option is empty", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const { deps, calls } = makeDeps({
+      existing: new Set(["/Users/me/go/src/arnac-hotfix-worktree"]),
+      responder: (call) => {
+        if (call.args.includes("--is-inside-work-tree")) {
+          return ok("true\n");
+        }
+        return undefined;
+      },
+    });
+    await ensureHotfixWorktree(repoRoot, deps, { ghPath: "" });
+    const helperAdd = calls.find(
+      (c) =>
+        c.args.includes("--add") &&
+        c.args.includes("credential.https://github.com.helper") &&
+        typeof c.args.at(-1) === "string" &&
+        (c.args.at(-1) as string).includes("auth git-credential")
+    );
+    expect(helperAdd?.args.at(-1)).toBe("!gh auth git-credential");
+  });
+
+  it("never writes outside `--worktree` scope", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const { deps, calls } = makeDeps({
+      responder: (call) => {
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
+          return ok("origin/main\n");
+        }
+        return undefined;
+      },
+    });
+
+    await ensureHotfixWorktree(repoRoot, deps, { ghPath: "/usr/bin/gh" });
+
+    const insteadOf = calls.filter((c) =>
+      c.args.includes("url.https://github.com/.insteadOf")
+    );
+    const helperWrites = calls.filter(
+      (c) =>
+        c.args.includes("credential.https://github.com.helper") &&
+        (c.args.includes("--add") || c.args.includes("--unset-all"))
+    );
+    for (const c of [...insteadOf, ...helperWrites]) {
+      expect(c.args).toContain("--worktree");
+      expect(c.args).not.toContain("--global");
+      expect(c.args).not.toContain("--system");
+    }
+  });
+
+  it("runs the postCreateCommand once (in the worktree cwd) after a fresh `git worktree add`", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const wt = "/Users/me/go/src/arnac-hotfix-worktree";
+    const { deps, calls, logs } = makeDeps({
+      responder: (call) => {
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
+          return ok("origin/main\n");
+        }
+        return undefined;
+      },
+    });
+
+    const res = await ensureHotfixWorktree(repoRoot, deps, {
+      postCreateCommand: "./atool prepare-codeenv",
+    });
+    expect(res.created).toBe(true);
+
+    const post = calls.filter(
+      (c) => c.file === "sh" && c.args[0] === "-c"
+    );
+    expect(post).toHaveLength(1);
+    expect(post[0].args[1]).toBe("./atool prepare-codeenv");
+    expect(post[0].cwd).toBe(wt);
+    expect(logs.some((l) => l.includes("post-create completed"))).toBe(true);
+  });
+
+  it("does NOT run the postCreateCommand when the worktree is reused (one-shot only)", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const wt = "/Users/me/go/src/arnac-hotfix-worktree";
+    const { deps, calls } = makeDeps({
+      existing: new Set([wt]),
+      responder: (call) => {
+        if (call.args.includes("--is-inside-work-tree")) {
+          return ok("true\n");
+        }
+        return undefined;
+      },
+    });
+
+    const res = await ensureHotfixWorktree(repoRoot, deps, {
+      postCreateCommand: "./atool prepare-codeenv",
+    });
+    expect(res.created).toBe(false);
+
+    const post = calls.filter(
+      (c) => c.file === "sh" && c.args[0] === "-c"
+    );
+    expect(post).toHaveLength(0);
+  });
+
+  it("skips the postCreateCommand when the option is empty / missing", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const { deps, calls } = makeDeps({
+      responder: (call) => {
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
+          return ok("origin/main\n");
+        }
+        return undefined;
+      },
+    });
+
+    await ensureHotfixWorktree(repoRoot, deps, { postCreateCommand: "" });
+    expect(calls.filter((c) => c.file === "sh")).toHaveLength(0);
+
+    await ensureHotfixWorktree(repoRoot, deps, {});
+    expect(calls.filter((c) => c.file === "sh")).toHaveLength(0);
+  });
+
+  it("does not fail the worktree when the postCreateCommand exits non-zero (best-effort)", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const { deps, logs } = makeDeps({
+      responder: (call) => {
+        if (call.file === "sh") {
+          return fail("exit 1");
+        }
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
+          return ok("origin/main\n");
+        }
+        return undefined;
+      },
+    });
+
+    const res = await ensureHotfixWorktree(repoRoot, deps, {
+      postCreateCommand: "./atool prepare-codeenv",
+    });
+    expect(res.created).toBe(true);
+    expect(res.fallback).toBeUndefined();
+    expect(logs.some((l) => l.includes("post-create failed"))).toBe(true);
+  });
+
+  it("logs and continues when enabling extensions.worktreeConfig fails (no fallback, worktree still works)", async () => {
+    const repoRoot = "/Users/me/go/src/arnac";
+    const { deps, calls, logs } = makeDeps({
+      responder: (call) => {
+        if (call.args.includes("extensions.worktreeConfig")) {
+          return fail("permission denied");
+        }
+        if (
+          call.args.includes("symbolic-ref") &&
+          call.args.some((a) => a.startsWith("refs/remotes/"))
+        ) {
+          return ok("origin/main\n");
+        }
+        return undefined;
+      },
+    });
+
+    const res = await ensureHotfixWorktree(repoRoot, deps, { ghPath: "gh" });
+    expect(res.created).toBe(true);
+    expect(res.fallback).toBeUndefined();
+    expect(
+      calls.filter((c) =>
+        c.args.includes("url.https://github.com/.insteadOf")
+      )
+    ).toHaveLength(0);
+    expect(logs.some((l) => l.includes("https-rewrite skipped"))).toBe(true);
+  });
+});
+
+describe("applyWorktreeHttpsRewrite (unit)", () => {
+  it("issues exactly the expected sequence: enable extension → replace insteadOf → unset+add empty+add gh helper", () => {
+    const calls: ExecCall[] = [];
+    const deps: WorktreeDeps = {
+      exec: (file, args, opts) => {
+        calls.push({ file, args: [...args], cwd: opts?.cwd });
+        return ok("");
+      },
+      existsSync: () => true,
+      mkdirSync: () => undefined,
+      log: () => undefined,
+    };
+
+    applyWorktreeHttpsRewrite("/repo", "/repo-wt", "/usr/local/bin/gh", deps);
+
+    const argsList = calls.map((c) => c.args.join(" "));
+    expect(argsList).toEqual([
+      "-C /repo config extensions.worktreeConfig true",
+      "-C /repo-wt config --worktree --replace-all url.https://github.com/.insteadOf git@github.com:",
+      "-C /repo-wt config --worktree --unset-all credential.https://github.com.helper",
+      "-C /repo-wt config --worktree --add credential.https://github.com.helper ",
+      "-C /repo-wt config --worktree --add credential.https://github.com.helper !/usr/local/bin/gh auth git-credential",
+    ]);
   });
 });
