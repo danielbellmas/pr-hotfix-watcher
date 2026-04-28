@@ -4,7 +4,7 @@ import { runTests } from "@vscode/test-electron";
 /**
  * Deliberately narrow harness: only catches "extension failed to activate" or
  * "webview HTML unparsable". Flow behavior lives in the in-process integration
- * suite at `test/prTreeProvider.integration.test.ts`.
+ * suite at `test/prListController.integration.test.ts`.
  */
 async function main(): Promise<void> {
   try {

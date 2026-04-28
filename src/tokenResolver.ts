@@ -23,8 +23,13 @@ export type TokenConfigProvider = {
 };
 
 export type TokenResolverDeps = {
-  /** Sync `gh auth token`. Returns `undefined` on any failure. */
-  exec: (file: string, args: string[], timeoutMs: number) => string | undefined;
+  /** Async `gh auth token`. Returns `undefined` on any failure. May return
+   *  a sync value too (back-compat for tests that don't need Promise plumbing). */
+  exec: (
+    file: string,
+    args: string[],
+    timeoutMs: number
+  ) => Promise<string | undefined> | string | undefined;
   secrets: SecretStore;
   config: TokenConfigProvider;
   envToken: () => string | undefined;
@@ -48,7 +53,7 @@ export class TokenResolver {
 
   async resolve(): Promise<string | undefined> {
     const exe = this.deps.config.ghPath().trim() || "gh";
-    const fromGh = this.fromGhCli(exe);
+    const fromGh = await this.fromGhCli(exe);
     if (fromGh) {
       return fromGh;
     }
@@ -79,13 +84,13 @@ export class TokenResolver {
 
   /** Cache is keyed on the executable path so `ghPath` config changes don't
    *  serve a stale token from the previous binary. */
-  fromGhCli(executable: string): string | undefined {
+  async fromGhCli(executable: string): Promise<string | undefined> {
     const now = this.deps.now();
     const c = this.cache;
     if (c && c.executable === executable && now - c.at < GH_TOKEN_TTL_MS) {
       return c.value;
     }
-    const out = this.deps.exec(executable, ["auth", "token"], 8000);
+    const out = await this.deps.exec(executable, ["auth", "token"], 8000);
     const value = out?.trim() || undefined;
     this.cache = { executable, value, at: now };
     return value;

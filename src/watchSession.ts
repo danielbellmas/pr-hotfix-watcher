@@ -30,7 +30,7 @@ import { ensureHotfixWorktree } from "./worktreeManager";
  * Owns the watch lifecycle: pre-fcli upstream-PR poll, fcli execution, and
  * the post-fcli hotfix-PR poll + deploy. Centralizing keeps the invariants
  * (re-entrancy gate, frozen cli snapshot, "Stop is a no-op while deploying",
- * `deployRunning` mirrored to a context key) in one place. `PrTreeProvider`
+ * `deployRunning` mirrored to a context key) in one place. `PrListController`
  * keeps the PR catalog and delegates everything watch-related here.
  */
 

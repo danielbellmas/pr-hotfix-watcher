@@ -106,11 +106,17 @@ type RepoPullListItem = {
  * silently return 0 results for some private repos despite the PRs being
  * fully accessible via the Pulls API — that broke the empty-state UX.
  *
- * Fetches the last 100 PRs (sorted by updated-desc) and filters by author
- * client-side. Trade-off: a contributor whose last PR is older than the
- * 100-most-recent in the repo will not appear; for the watcher's "queue
- * recently-merged PRs to hotfix" use case that bound is acceptable.
+ * Pages through the repo's PR list (sorted by updated-desc) until we collect
+ * `perPage` PRs authored by `authorLogin`, or hit the page cap. The page cap
+ * bounds API quota in busy repos where the author's PRs are spread across
+ * many recently-updated PRs by other contributors.
+ *
+ * Trade-off: a contributor whose last PR is older than `MAX_PAGES * 100`
+ * repo PRs will not appear; for the watcher's "queue recently-merged PRs to
+ * hotfix" use case that bound is acceptable.
  */
+const AUTHOR_PR_MAX_PAGES = 5;
+
 export async function searchAuthorPullRequests(
   token: string,
   owner: string,
@@ -118,20 +124,37 @@ export async function searchAuthorPullRequests(
   authorLogin: string,
   perPage: number
 ): Promise<SearchIssueItem[]> {
-  const path = `/repos/${owner}/${repo}/pulls?state=all&sort=updated&direction=desc&per_page=100`;
-  const data = await githubJson<RepoPullListItem[]>(path, token);
   const limit = Math.max(1, Math.min(perPage, 100));
-  return data
-    .filter((p) => p.user?.login === authorLogin)
-    .slice(0, limit)
-    .map((p) => ({
-      number: p.number,
-      title: p.title,
-      state: p.state,
-      created_at: p.created_at,
-      html_url: p.html_url,
-      pull_request: { merged_at: p.merged_at },
-    }));
+  const collected: RepoPullListItem[] = [];
+  for (let page = 1; page <= AUTHOR_PR_MAX_PAGES; page++) {
+    const path = `/repos/${owner}/${repo}/pulls?state=all&sort=updated&direction=desc&per_page=100&page=${page}`;
+    const data = await githubJson<RepoPullListItem[]>(path, token);
+    if (data.length === 0) {
+      break;
+    }
+    for (const p of data) {
+      if (p.user?.login === authorLogin) {
+        collected.push(p);
+        if (collected.length >= limit) {
+          break;
+        }
+      }
+    }
+    if (collected.length >= limit) {
+      break;
+    }
+    if (data.length < 100) {
+      break;
+    }
+  }
+  return collected.slice(0, limit).map((p) => ({
+    number: p.number,
+    title: p.title,
+    state: p.state,
+    created_at: p.created_at,
+    html_url: p.html_url,
+    pull_request: { merged_at: p.merged_at },
+  }));
 }
 
 export async function searchRepoPullRequests(

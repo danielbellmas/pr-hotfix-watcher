@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/arnac-io/arnac"
+    "url": "https://github.com/arnac-io/fordefi-hotfix-watcher"
   },
   "engines": {
     "vscode": "^1.94.0"
@@ -119,10 +119,17 @@
         },
         "fordefiHotfix.recentPrCount": {
           "type": "number",
-          "default": 20,
+          "default": 30,
           "minimum": 1,
           "maximum": 100,
-          "description": "How many of your most recently updated PRs to show."
+          "description": "How many of your most recently updated PRs to fetch from GitHub."
+        },
+        "fordefiHotfix.displayPrLimit": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum number of PR rows shown in the sidebar at once. Checked PRs always stay visible even when they fall below this limit."
         },
         "fordefiHotfix.pollIntervalSeconds": {
           "type": "number",
@@ -249,21 +256,25 @@
     "vscode:prepublish": "npm run verify",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "lint": "eslint src test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e:compile": "tsc -p test/e2e/tsconfig.json",
     "test:e2e": "npm run compile && npm run test:e2e:compile && node test/e2e/out/runTest.js",
-    "verify": "npm run compile && npm run test",
+    "verify": "npm run lint && npm run compile && npm run test",
     "package": "vsce package"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.94.0",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.0",
+    "eslint": "^10.2.1",
     "mocha": "^11.7.5",
     "typescript": "^5.4.0",
+    "typescript-eslint": "^8.59.1",
     "vitest": "^3.1.4"
   }
 }

@@ -70,7 +70,7 @@ flowchart LR
     WS[(workspaceState fordefiHotfix.hotfixCliView)]
     CFG[Workspace settings defaults]
   end
-  W -->|postMessage| P[PrTreeProvider.setHotfixCliOptions]
+  W -->|postMessage| P[PrListController.setHotfixCliOptions]
   P --> WS
   CFG -.->|normalize on load| P
 ```
@@ -101,7 +101,7 @@ Choices persist in **`fordefiHotfix.prListView`** (workspace state).
 sequenceDiagram
   participant U as User
   participant W as Webview
-  participant P as PrTreeProvider / WatchSession
+  participant P as PrListController / WatchSession
   participant GH as GitHub
   participant T as Integrated terminal / spawn
   participant O as Output channel

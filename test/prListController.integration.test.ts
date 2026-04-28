@@ -14,6 +14,19 @@ vi.mock("vscode", async () => {
 
 vi.mock("node:child_process", () => ({
   execFileSync: vi.fn(() => "fake-gh-token\n"),
+  execFile: vi.fn(
+    (
+      _file: string,
+      _args: string[],
+      _opts: unknown,
+      cb: (
+        err: Error | null,
+        result: { stdout: string; stderr: string }
+      ) => void
+    ) => {
+      cb(null, { stdout: "fake-gh-token\n", stderr: "" });
+    }
+  ),
   spawn: vi.fn(),
 }));
 
@@ -66,11 +79,11 @@ import { buildPull, makeFetchStub, pullPath } from "./_util/githubStubs";
 import { invalidateGhTokenCache } from "../src/config";
 import { runHotfixDeploy } from "../src/deployRun";
 import { runHotfixShellCommandAfterMerge } from "../src/hotfixRun";
-import { PrTreeProvider } from "../src/prTreeProvider";
+import { PrListController } from "../src/prListController";
 
 const mockedRunFcli = vi.mocked(runHotfixShellCommandAfterMerge);
 const mockedRunDeploy = vi.mocked(runHotfixDeploy);
-const mockedExecFileSync = vi.mocked(cp.execFileSync);
+const mockedExecFile = vi.mocked(cp.execFile);
 
 /**
  * Real-timer alternative to `vi.waitFor`. Keeps the provider's own
@@ -113,7 +126,7 @@ function deferred<T>(): DeferredResult<T> {
   return { promise, resolve };
 }
 
-describe("PrTreeProvider integration", () => {
+describe("PrListController integration", () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
@@ -121,9 +134,22 @@ describe("PrTreeProvider integration", () => {
     installBaseConfig();
     mockedRunFcli.mockReset();
     mockedRunDeploy.mockReset();
-    mockedExecFileSync.mockReset();
-    mockedExecFileSync.mockImplementation(
-      () => "fake-gh-token\n" as unknown as Buffer
+    mockedExecFile.mockReset();
+    // Re-install the default `gh auth token` happy-path stub. Cast through
+    // `unknown` because the overloaded execFile signature is too permissive
+    // for vitest's typed mock helper.
+    (mockedExecFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (
+        _file: string,
+        _args: string[],
+        _opts: unknown,
+        cb: (
+          err: Error | null,
+          result: { stdout: string; stderr: string }
+        ) => void
+      ) => {
+        cb(null, { stdout: "fake-gh-token\n", stderr: "" });
+      }
     );
     invalidateGhTokenCache();
     global.fetch = vi.fn(async () => {
@@ -180,7 +206,7 @@ describe("PrTreeProvider integration", () => {
     const deploy = deferred<{ exitCode: number; ok: boolean }>();
     mockedRunDeploy.mockImplementation(async () => deploy.promise);
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(100, true);
     provider.setCheckboxState(101, true);
@@ -246,7 +272,7 @@ describe("PrTreeProvider integration", () => {
     const deploy = deferred<{ exitCode: number; ok: boolean }>();
     mockedRunDeploy.mockImplementation(async () => deploy.promise);
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(100, true);
     provider.startWatch();
@@ -292,7 +318,7 @@ describe("PrTreeProvider integration", () => {
     });
     mockedRunDeploy.mockResolvedValue({ exitCode: 0, ok: true });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(200, true);
     provider.startWatch();
@@ -331,7 +357,7 @@ describe("PrTreeProvider integration", () => {
 
     getFakes().inputBox.mockImplementation(async () => undefined);
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(300, true);
     provider.startWatch();
@@ -372,7 +398,7 @@ describe("PrTreeProvider integration", () => {
       output: "",
     });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(400, true);
     provider.startWatch();
@@ -409,7 +435,7 @@ describe("PrTreeProvider integration", () => {
     });
     getFakes().inputBox.mockImplementation(async () => undefined);
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(500, true);
     provider.startWatch();
@@ -449,7 +475,7 @@ describe("PrTreeProvider integration", () => {
       output: "",
     });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(600, true);
     provider.startWatch();
@@ -489,7 +515,7 @@ describe("PrTreeProvider integration", () => {
       output: "",
     });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(800, true);
     provider.startWatch();
@@ -540,7 +566,7 @@ describe("PrTreeProvider integration", () => {
     });
     mockedRunDeploy.mockResolvedValue({ exitCode: 0, ok: true });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(850, true);
     provider.startWatch();
@@ -572,7 +598,7 @@ describe("PrTreeProvider integration", () => {
       ],
     });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(870, true);
     provider.startWatch();
@@ -619,7 +645,7 @@ describe("PrTreeProvider integration", () => {
     });
     mockedRunDeploy.mockResolvedValue({ exitCode: 7, ok: false });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(880, true);
     provider.startWatch();
@@ -640,14 +666,14 @@ describe("PrTreeProvider integration", () => {
     // covers the full true→false context-key cycle.
   });
 
-  it("token cache: many polls resolve to one execFileSync('gh auth token') call", async () => {
+  it("token cache: many polls resolve to one execFile('gh auth token') call", async () => {
     global.fetch = makeFetchStub({
       [pullPath("acme", "app", 700)]: [
         { body: buildPull({ number: 700, state: "open", merged_at: null }) },
       ],
     });
 
-    const provider = new PrTreeProvider(makeFakeExtensionContext());
+    const provider = new PrListController(makeFakeExtensionContext());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(700, true);
     provider.startWatch();
@@ -661,8 +687,8 @@ describe("PrTreeProvider integration", () => {
 
     provider.stopWatch();
 
-    expect(mockedExecFileSync).toHaveBeenCalledTimes(1);
-    const firstCall = mockedExecFileSync.mock.calls[0];
+    expect(mockedExecFile).toHaveBeenCalledTimes(1);
+    const firstCall = mockedExecFile.mock.calls[0];
     expect(firstCall[0]).toBe("gh");
     expect(firstCall[1]).toEqual(["auth", "token"]);
   });

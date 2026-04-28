@@ -1,9 +1,12 @@
 import * as cp from "node:child_process";
+import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { buildHotfixCliSuffix, type HotfixCliOptions } from "./hotfixCli";
 import { expandHotfixCommandTemplate } from "./hotfixCommandTemplate";
 import { parseHotfixRunMode, type HotfixRunMode } from "./hotfixRunHelpers";
 import { TokenResolver } from "./tokenResolver";
+
+const execFileAsync = promisify(cp.execFile);
 
 // Lazy singleton: built on first use, kept across calls so the resolver's
 // internal `gh auth token` cache actually amortizes across watch-poll ticks.
@@ -11,14 +14,14 @@ let _resolver: TokenResolver | undefined;
 function getTokenResolver(context: vscode.ExtensionContext): TokenResolver {
   if (!_resolver) {
     _resolver = new TokenResolver({
-      exec: (file, args, timeoutMs) => {
+      exec: async (file, args, timeoutMs) => {
         try {
-          return cp.execFileSync(file, args, {
+          const { stdout } = await execFileAsync(file, args, {
             encoding: "utf8",
             timeout: timeoutMs,
-            stdio: ["ignore", "pipe", "pipe"],
             windowsHide: true,
           });
+          return stdout;
         } catch {
           return undefined;
         }
@@ -79,7 +82,14 @@ export function getRepoConfig(): { owner: string; repo: string } {
 export function getRecentPrCount(): number {
   return vscode.workspace
     .getConfiguration("fordefiHotfix")
-    .get<number>("recentPrCount", 20);
+    .get<number>("recentPrCount", 30);
+}
+
+export function getDisplayPrLimit(): number {
+  const n = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<number>("displayPrLimit", 10);
+  return Math.max(1, Math.min(100, Math.round(n)));
 }
 
 export function getPollIntervalMs(): number {

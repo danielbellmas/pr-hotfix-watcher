@@ -152,7 +152,7 @@ describe("searchAuthorPullRequests", () => {
       await searchAuthorPullRequests("t0k3n", "owner", "repo", "alice", 20);
       expect(stub.calls).toHaveLength(1);
       expect(stub.calls[0].url).toBe(
-        "https://api.github.com/repos/owner/repo/pulls?state=all&sort=updated&direction=desc&per_page=100"
+        "https://api.github.com/repos/owner/repo/pulls?state=all&sort=updated&direction=desc&per_page=100&page=1"
       );
     } finally {
       stub.restore();

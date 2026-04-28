@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="{{CSP}}" />
+  <link rel="stylesheet" href="{{STYLE_URI}}" />
+</head>
+<body data-gh-scheme="{{GH_SCHEME}}">
+  <div class="hero">
+    <div class="hero-row">
+      <div class="hero-sub" id="meta"><span class="skeleton skeleton-meta" aria-label="Loading"></span></div>
+      <div class="pill-row" id="pills"></div>
+    </div>
+  </div>
+  <div class="watch-panel" id="watchPanel" hidden aria-live="polite">
+    <div class="watch-panel-title">Live watch</div>
+    <div class="watch-headline" id="watchHeadline"></div>
+    <div class="watch-hotfix" id="watchHotfix"></div>
+    <div class="watch-list" id="watchList"></div>
+  </div>
+  <div class="search-row" id="searchRow">
+    <input
+      type="search"
+      class="search-input"
+      id="search"
+      placeholder="Search PRs by title or #number…"
+      spellcheck="false"
+      autocomplete="off"
+    />
+    <span class="search-status" id="searchStatus" aria-live="polite"></span>
+  </div>
+  <div class="toolbar" id="toolbar" role="toolbar" aria-label="Hotfix controls">
+    <div class="tb-group" aria-label="Hotfix CLI flags">
+      <span class="tb-label">CLI</span>
+      <select id="hotfixEnvSel" class="cli-select" aria-label="Environment: pre, prod, or both" title="fcli --env target. Choose 'pre and prod' to run both in sequence (pre first; prod gated on pre success).">
+        <option value="pre">pre</option>
+        <option value="prod">prod</option>
+        <option value="both">pre and prod</option>
+      </select>
+      <label class="cli-check" title="Open the hotfix PR as draft (passes --draft to fcli).">
+        <input type="checkbox" id="hotfixDraftCb" aria-label="draft" />
+        draft
+      </label>
+      <label class="cli-check" title="Skip E2E in CI for the hotfix (passes --critical-fast-track to fcli).">
+        <input type="checkbox" id="hotfixFtCb" aria-label="critical fast track" />
+        fast track
+      </label>
+      <label class="cli-check" title="After the created hotfix PR is merged, dispatch the matching workflow(s) in arnac-io/workflows.">
+        <input type="checkbox" id="hotfixDeployCb" aria-label="deploy" />
+        deploy
+      </label>
+    </div>
+    <div class="tb-divider" aria-hidden="true"></div>
+    <div class="tb-group" aria-label="View">
+      <span class="tb-label">View</span>
+      <select id="prStatusFilterSel" class="cli-select" aria-label="Filter by PR status">
+        <option value="all">All</option>
+        <option value="open">Open</option>
+        <option value="merged">Merged</option>
+      </select>
+      <select
+        id="prSortSel"
+        class="cli-select"
+        aria-label="Sort: open first, or by creation time"
+        title="Open first: open PRs then merged. Newest: by PR created date."
+      >
+        <option value="status">Open first</option>
+        <option value="created">Newest</option>
+      </select>
+    </div>
+  </div>
+  <div class="list" id="list"></div>
+  <script nonce="{{NONCE}}" src="{{SCRIPT_URI}}"></script>
+</body>
+</html>

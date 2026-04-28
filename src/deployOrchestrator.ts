@@ -15,7 +15,7 @@ import {
 
 /**
  * Pure orchestration of the post-fcli deploy flow. Separated from
- * {@link PrTreeProvider} so it can be unit-tested with injected doubles for
+ * {@link PrListController} so it can be unit-tested with injected doubles for
  * all side effects (token resolution, PR watch, deploy run, UI prompts).
  */
 export type DeployOrchestratorHooks = {

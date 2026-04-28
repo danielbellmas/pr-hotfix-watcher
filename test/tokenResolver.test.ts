@@ -119,42 +119,42 @@ describe("TokenResolver.fromGhCli — TTL cache", () => {
     deps = makeDeps({ exec, now: () => realNow });
   });
 
-  it("caches subsequent calls within TTL", () => {
+  it("caches subsequent calls within TTL", async () => {
     const r = new TokenResolver(deps);
-    expect(r.fromGhCli("gh")).toBe("tok");
-    expect(r.fromGhCli("gh")).toBe("tok");
-    expect(r.fromGhCli("gh")).toBe("tok");
+    expect(await r.fromGhCli("gh")).toBe("tok");
+    expect(await r.fromGhCli("gh")).toBe("tok");
+    expect(await r.fromGhCli("gh")).toBe("tok");
     expect(exec).toHaveBeenCalledTimes(1);
   });
 
-  it("re-shells after TTL expires", () => {
+  it("re-shells after TTL expires", async () => {
     const r = new TokenResolver(deps);
-    r.fromGhCli("gh");
+    await r.fromGhCli("gh");
     realNow += 30_001;
-    r.fromGhCli("gh");
+    await r.fromGhCli("gh");
     expect(exec).toHaveBeenCalledTimes(2);
   });
 
-  it("re-shells when the executable changes (different ghPath)", () => {
+  it("re-shells when the executable changes (different ghPath)", async () => {
     const r = new TokenResolver(deps);
-    r.fromGhCli("gh");
-    r.fromGhCli("/opt/homebrew/bin/gh");
+    await r.fromGhCli("gh");
+    await r.fromGhCli("/opt/homebrew/bin/gh");
     expect(exec).toHaveBeenCalledTimes(2);
   });
 
-  it("caches a NEGATIVE result (gh returned undefined) within TTL", () => {
+  it("caches a NEGATIVE result (gh returned undefined) within TTL", async () => {
     exec.mockReturnValue(undefined);
     const r = new TokenResolver(deps);
-    expect(r.fromGhCli("gh")).toBeUndefined();
-    expect(r.fromGhCli("gh")).toBeUndefined();
+    expect(await r.fromGhCli("gh")).toBeUndefined();
+    expect(await r.fromGhCli("gh")).toBeUndefined();
     expect(exec).toHaveBeenCalledTimes(1);
   });
 
-  it("invalidate() forces a re-shell on the next call", () => {
+  it("invalidate() forces a re-shell on the next call", async () => {
     const r = new TokenResolver(deps);
-    r.fromGhCli("gh");
+    await r.fromGhCli("gh");
     r.invalidate();
-    r.fromGhCli("gh");
+    await r.fromGhCli("gh");
     expect(exec).toHaveBeenCalledTimes(2);
   });
 });

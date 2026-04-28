@@ -10,7 +10,7 @@ import { parseGitHubRepoFromRemote, readOriginRemote } from "./gitRemote";
 import { setAuthFailureHandler } from "./githubClient";
 import { registerHotfixCliOutputChannel } from "./hotfixRun";
 import { HotfixPrWebviewProvider } from "./hotfixPrWebview";
-import { PrTreeProvider } from "./prTreeProvider";
+import { PrListController } from "./prListController";
 
 /**
  * Settings that, when changed, actually change the PR list. Everything else
@@ -37,8 +37,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push({
     dispose: () => setAuthFailureHandler(undefined),
   });
-  const provider = new PrTreeProvider(context);
-  const webviewProvider = new HotfixPrWebviewProvider(provider);
+  const provider = new PrListController(context);
+  const webviewProvider = new HotfixPrWebviewProvider(
+    provider,
+    context.extensionUri
+  );
 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveColorTheme(() =>
@@ -51,6 +54,7 @@ export function activate(context: vscode.ExtensionContext): void {
         webviewOptions: { retainContextWhenHidden: true },
       }
     ),
+    { dispose: () => webviewProvider.dispose() },
     { dispose: () => provider.stopWatch() },
     vscode.commands.registerCommand("fordefiHotfix.setToken", async () => {
       const token = await vscode.window.showInputBox({

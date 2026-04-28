@@ -10,6 +10,7 @@ import {
 } from "./githubClient";
 import {
   buildHotfixCommand,
+  getDisplayPrLimit,
   getHotfixCliOptionsFromConfig,
   getRecentPrCount,
   getRepoConfig,
@@ -81,7 +82,7 @@ export type HotfixPrViewState = {
   deployRunning: boolean;
 };
 
-export class PrTreeProvider {
+export class PrListController {
   private _onDidChangeTreeData = new vscode.EventEmitter<
     PrRow | undefined | void
   >();
@@ -282,12 +283,13 @@ export class PrTreeProvider {
       this.searchQuery,
       this.selected
     );
-    return applyPrViewFilterSort(
+    const sorted = applyPrViewFilterSort(
       merged,
       this.prListView.statusFilter,
       this.prListView.sortMode,
       this.selected
     );
+    return capDisplayRows(sorted, getDisplayPrLimit(), this.selected);
   }
 
   private async runRepoSearch(trimmed: string, gen: number): Promise<void> {
@@ -483,4 +485,28 @@ export class PrTreeProvider {
   private pollOnce(): Promise<void> {
     return this.watchSession.pollOnce();
   }
+}
+
+/**
+ * Cap visible PR rows at `limit` while keeping every selected PR visible.
+ * Sort order is preserved; selected rows beyond the cap are appended in their
+ * original relative order so the user never loses sight of a checked PR.
+ */
+export function capDisplayRows(
+  rows: readonly PrRow[],
+  limit: number,
+  selected: ReadonlySet<number>
+): PrRow[] {
+  if (rows.length <= limit) {
+    return [...rows];
+  }
+  const head = rows.slice(0, limit);
+  if (selected.size === 0) {
+    return head;
+  }
+  const inHead = new Set(head.map((r) => r.number));
+  const extras = rows
+    .slice(limit)
+    .filter((r) => selected.has(r.number) && !inHead.has(r.number));
+  return [...head, ...extras];
 }
