@@ -223,38 +223,19 @@ function getHtml(
       min-height: 100%;
     }
     .hero {
-      position: relative;
-      overflow: hidden;
-      border-radius: var(--hf-radius);
-      padding: 12px 12px 10px;
+      padding: 4px 2px 10px;
       margin-bottom: 12px;
-      background: linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--vscode-button-background) 35%, transparent),
-        color-mix(in srgb, var(--vscode-terminal-ansiMagenta) 22%, transparent) 55%,
-        color-mix(in srgb, var(--vscode-terminal-ansiCyan) 18%, transparent)
-      );
-      border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 55%, transparent);
-      box-shadow: 0 8px 28px color-mix(in srgb, var(--vscode-widget-shadow) 40%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--vscode-widget-border) 60%, transparent);
     }
-    .hero::after {
-      content: "";
-      position: absolute;
-      inset: -40% -20%;
-      background: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--vscode-editorWarning-foreground) 25%, transparent), transparent 55%),
-                  radial-gradient(circle at 80% 0%, color-mix(in srgb, var(--vscode-terminal-ansiBlue) 20%, transparent), transparent 50%);
-      pointer-events: none;
-    }
-    .hero-inner { position: relative; z-index: 1; }
+    .hero-inner { }
     .hero-title {
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      font-size: calc(var(--vscode-font-size) + 2px);
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      font-size: calc(var(--vscode-font-size) + 4px);
+      line-height: 1.2;
+      color: var(--vscode-foreground);
+      margin: 0 0 4px;
     }
-    .spark { font-size: 1.1em; filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--vscode-widget-shadow) 50%, transparent)); }
     .hero-sub {
       margin-top: 6px;
       opacity: 0.92;
@@ -574,7 +555,7 @@ function getHtml(
 <body data-gh-scheme="${initialGithubScheme}">
   <div class="hero">
     <div class="hero-inner">
-      <div class="hero-title"><span class="spark">🔥</span> Hotfix PRs</div>
+      <div class="hero-title">Hotfix PRs</div>
       <div class="hero-sub" id="meta"></div>
       <div class="pill-row" id="pills"></div>
     </div>
