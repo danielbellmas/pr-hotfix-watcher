@@ -3,6 +3,7 @@ import {
   getAuthenticatedLogin,
   getPullRequest,
   GitHubError,
+  isHotfixTitle,
   isOpenOrMergedPull,
   searchAuthorPullRequests,
   searchRepoPullRequests,
@@ -316,7 +317,10 @@ export class PrListController {
       }
       this.remoteRows = items
         .map((it) => this.rowFromSearchItem(it))
-        .filter((row) => row.state === "open" || row.mergedAt);
+        .filter(
+          (row) =>
+            (row.state === "open" || row.mergedAt) && !isHotfixTitle(row.title)
+        );
       this.searchRemoteError = null;
     } catch (e) {
       if (gen !== this.remoteSearchGen || trimmed !== this.searchQuery.trim()) {
@@ -407,7 +411,7 @@ export class PrListController {
         const nextRows: PrRow[] = [];
         for (let i = 0; i < numbers.length; i++) {
           const p = pulls[i];
-          if (!p || !isOpenOrMergedPull(p)) {
+          if (!p || !isOpenOrMergedPull(p) || isHotfixTitle(p.title)) {
             continue;
           }
           nextRows.push({

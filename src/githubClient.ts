@@ -30,6 +30,10 @@ export function isOpenOrMergedPull(p: GitHubPull): boolean {
   return p.state === "open" || Boolean(p.merged_at);
 }
 
+export function isHotfixTitle(title: string): boolean {
+  return title.toLowerCase().includes("hotfix");
+}
+
 export class GitHubError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
