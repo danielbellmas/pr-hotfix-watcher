@@ -8,7 +8,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/arnac-io/fordefi-hotfix-watcher"
+    "url": "https://github.com/danielbellmas/pr-hotfix-watcher"
   },
   "engines": {
     "vscode": "^1.94.0"
