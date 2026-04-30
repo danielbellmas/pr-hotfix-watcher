@@ -23,6 +23,7 @@ suite("Fordefi Hotfix Watcher smoke", () => {
       "fordefiHotfix.startWatch",
       "fordefiHotfix.stopWatch",
       "fordefiHotfix.syncRepoFromGit",
+      "fordefiHotfix.doctor",
     ]) {
       assert.ok(commands.includes(id), `missing command: ${id}`);
     }

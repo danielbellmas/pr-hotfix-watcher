@@ -6,6 +6,7 @@ import {
   storeGitHubToken,
 } from "./config";
 import { registerHotfixDeployOutputChannel } from "./deployRun";
+import { runDoctor } from "./doctorRun";
 import { parseGitHubRepoFromRemote, readOriginRemote } from "./gitRemote";
 import { setAuthFailureHandler } from "./githubClient";
 import { registerHotfixCliOutputChannel } from "./hotfixRun";
@@ -89,6 +90,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand("fordefiHotfix.stopWatch", () =>
       provider.stopWatch()
+    ),
+    vscode.commands.registerCommand("fordefiHotfix.doctor", () =>
+      runDoctor(context)
     ),
     vscode.commands.registerCommand(
       "fordefiHotfix.syncRepoFromGit",

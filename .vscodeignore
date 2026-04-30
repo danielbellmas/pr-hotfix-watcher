@@ -2,8 +2,10 @@
 .vscode-test/**
 src/**
 test/**
+scripts/**
 .gitignore
 .yarnrc
+eslint.config.*
 **/tsconfig.json
 **/*.map
 **/*.ts

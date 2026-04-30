@@ -69,6 +69,11 @@
         "command": "fordefiHotfix.syncRepoFromGit",
         "category": "Hotfix",
         "title": "Set owner/repo from git remote"
+      },
+      {
+        "command": "fordefiHotfix.doctor",
+        "category": "Hotfix",
+        "title": "Doctor (diagnose fresh-install setup)"
       }
     ],
     "menus": {
@@ -100,6 +105,10 @@
         },
         {
           "command": "fordefiHotfix.syncRepoFromGit",
+          "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.doctor",
           "when": "true"
         }
       ]
@@ -262,6 +271,7 @@
     "test:e2e:compile": "tsc -p test/e2e/tsconfig.json",
     "test:e2e": "npm run compile && npm run test:e2e:compile && node test/e2e/out/runTest.js",
     "verify": "npm run lint && npm run compile && npm run test",
+    "verify:install": "scripts/verify-install.sh",
     "package": "vsce package"
   },
   "devDependencies": {
