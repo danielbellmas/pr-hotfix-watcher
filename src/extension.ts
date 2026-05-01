@@ -3,6 +3,8 @@ import {
   clearStoredGithubToken,
   getRepoRoot,
   invalidateGhTokenCache,
+  isDebugTerminalEnabled,
+  setDebugTerminalEnabled,
   storeGitHubToken,
 } from "./config";
 import { registerHotfixDeployOutputChannel } from "./deployRun";
@@ -31,6 +33,10 @@ const TOKEN_AFFECTING_KEYS = [
   "fordefiHotfix.githubPat",
 ];
 
+const DEBUG_TERMINAL_KEY = "fordefiHotfix.debugTerminal";
+const RUN_MODE_MIGRATION_DONE_KEY =
+  "fordefiHotfix.hotfixRunModeMigrationDoneV1";
+
 export function activate(context: vscode.ExtensionContext): void {
   registerHotfixCliOutputChannel(context);
   registerHotfixDeployOutputChannel(context);
@@ -38,11 +44,33 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push({
     dispose: () => setAuthFailureHandler(undefined),
   });
+
+  // One-shot migration: users who pinned the legacy
+  // `fordefiHotfix.hotfixRunMode: "integratedTerminal"` get auto-flipped to
+  // the new `debugTerminal: true` so transparent mode doesn't surprise them.
+  void migrateLegacyRunMode(context);
+
   const provider = new PrListController(context);
   const webviewProvider = new HotfixPrWebviewProvider(
     provider,
     context.extensionUri
   );
+
+  const debugStatusBar = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100
+  );
+  debugStatusBar.command = "fordefiHotfix.toggleDebugTerminal";
+  debugStatusBar.tooltip =
+    "Toggle Hotfix debug terminal mode (transparent ↔ visible terminal). When 'debug' is on, the hotfix command runs in a real integrated terminal so you can watch / intervene.";
+  context.subscriptions.push(debugStatusBar);
+
+  const refreshDebugStatusBar = (): void => {
+    const enabled = isDebugTerminalEnabled();
+    debugStatusBar.text = enabled ? "$(beaker) Hotfix: debug" : "$(eye-closed) Hotfix: transparent";
+    debugStatusBar.show();
+  };
+  refreshDebugStatusBar();
 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveColorTheme(() =>
@@ -95,6 +123,36 @@ export function activate(context: vscode.ExtensionContext): void {
       runDoctor(context)
     ),
     vscode.commands.registerCommand(
+      "fordefiHotfix.toggleDebugTerminal",
+      async () => {
+        const next = !isDebugTerminalEnabled();
+        await setDebugTerminalEnabled(next);
+        refreshDebugStatusBar();
+        void vscode.window.showInformationMessage(
+          next
+            ? "Hotfix debug terminal mode: ON. Next run will use a visible integrated terminal."
+            : "Hotfix transparent mode: ON. Next run will be silent — you'll only see notifications for actions and milestones."
+        );
+      }
+    ),
+    vscode.commands.registerCommand(
+      "fordefiHotfix.openWorktreeTerminal",
+      (cwdArg?: string) => {
+        const cwd = typeof cwdArg === "string" && cwdArg.trim() ? cwdArg : getRepoRoot();
+        if (!cwd) {
+          void vscode.window.showErrorMessage(
+            "No worktree path known yet. Start a hotfix run first."
+          );
+          return;
+        }
+        const term = vscode.window.createTerminal({
+          name: "Hotfix worktree",
+          cwd,
+        });
+        term.show(true);
+      }
+    ),
+    vscode.commands.registerCommand(
       "fordefiHotfix.syncRepoFromGit",
       async () => {
         const root = getRepoRoot();
@@ -145,8 +203,46 @@ export function activate(context: vscode.ExtensionContext): void {
       if (LIST_AFFECTING_KEYS.some((k) => e.affectsConfiguration(k))) {
         void provider.refresh();
       }
+      if (e.affectsConfiguration(DEBUG_TERMINAL_KEY)) {
+        refreshDebugStatusBar();
+      }
     })
   );
+}
+
+/**
+ * One-shot migration: users with the legacy `hotfixRunMode` setting pinned
+ * to `"integratedTerminal"` have it equivalently expressed via the new
+ * `debugTerminal: true` so they keep their visible-terminal flow on first
+ * upgrade. Other values (`"background"`, `"transparent"`, missing) collapse
+ * to transparent — which is the new default — and need no action.
+ *
+ * Gated by a globalState flag so the migration runs at most once per machine.
+ */
+async function migrateLegacyRunMode(
+  context: vscode.ExtensionContext
+): Promise<void> {
+  if (context.globalState.get<boolean>(RUN_MODE_MIGRATION_DONE_KEY) === true) {
+    return;
+  }
+  const cfg = vscode.workspace.getConfiguration("fordefiHotfix");
+  const inspected = cfg.inspect<string>("hotfixRunMode");
+  const explicit =
+    inspected?.workspaceValue ??
+    inspected?.workspaceFolderValue ??
+    inspected?.globalValue;
+  if (explicit === "integratedTerminal") {
+    try {
+      await cfg.update(
+        "debugTerminal",
+        true,
+        vscode.ConfigurationTarget.Global
+      );
+    } catch {
+      // Best-effort; users can flip the toggle by hand if this fails.
+    }
+  }
+  await context.globalState.update(RUN_MODE_MIGRATION_DONE_KEY, true);
 }
 
 export function deactivate(): void {}

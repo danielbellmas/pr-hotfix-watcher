@@ -9,11 +9,13 @@ import {
   type DeployTargets,
 } from "./deployWorkflow";
 import type { HotfixCliEnv } from "./hotfixCli";
+import { notifyMilestone } from "./notifyMilestone";
 import {
   buildDeployNotification,
   type DeployNotificationOutcome,
   showOsNotification,
 } from "./osNotify";
+import { registerActiveChild, unregisterActiveChild } from "./runRegistry";
 
 const DEPLOY_OUTPUT_TITLE = "Fordefi Hotfix Deploy";
 const DEPLOY_TERMINAL_NAME = "Hotfix Deploy";
@@ -69,24 +71,57 @@ function pingDeployFinished(
   });
 }
 
-async function runDeployBackground(
+function fireDeployStartedMilestone(
+  ch: vscode.OutputChannel,
+  env: HotfixCliEnv,
+  sourcePrNumbers: readonly number[] | undefined
+): void {
+  const prList = (sourcePrNumbers ?? []).slice().sort((a, b) => a - b);
+  const prText = prList.length === 0 ? "" : `PRs: ${prList.map((n) => `#${n}`).join(", ")}`;
+  void notifyMilestone({
+    title: `Hotfix deploy started`,
+    subtitle: `env: ${env}`,
+    body: prText,
+    severity: "info",
+    actions: [{ label: "Open output" }],
+    log: (l) => ch.appendLine(l),
+  }).then((picked) => {
+    if (picked === "Open output") {
+      ch.show(true);
+    }
+  });
+}
+
+async function runDeployTransparent(
   script: string,
   cwd: string,
   env: HotfixCliEnv,
   sourcePrNumbers: readonly number[] | undefined
 ): Promise<DeployRunResult> {
   const ch = getDeployOutputChannel();
+  fireDeployStartedMilestone(ch, env, sourcePrNumbers);
   const result = await runViaSpawn({
     command: script,
     cwd,
     shell: "/bin/bash",
     log: (chunk) => ch.append(chunk),
+    onChild: (child) => registerActiveChild("deploy", child),
   });
+  unregisterActiveChild("deploy");
   if (result.spawnError) {
     ch.appendLine(`[could not start deploy] ${result.spawnError.message}`);
-    void vscode.window.showErrorMessage(
-      `Hotfix deploy could not start: ${result.spawnError.message}`
-    );
+    void notifyMilestone({
+      title: "Hotfix deploy did not start",
+      subtitle: `env: ${env}`,
+      body: result.spawnError.message,
+      severity: "error",
+      actions: [{ label: "Open output" }],
+      log: (l) => ch.appendLine(l),
+    }).then((picked) => {
+      if (picked === "Open output") {
+        ch.show(true);
+      }
+    });
     pingDeployFinished(
       ch,
       { kind: "spawn_error", message: result.spawnError.message },
@@ -98,9 +133,17 @@ async function runDeployBackground(
   ch.appendLine("");
   if (result.signal) {
     ch.appendLine(`[deploy finished] signal ${result.signal}`);
-    void vscode.window.showWarningMessage(
-      `Hotfix deploy stopped (signal ${String(result.signal)}).`
-    );
+    void notifyMilestone({
+      title: "Hotfix deploy stopped",
+      subtitle: `env: ${env} — signal ${String(result.signal)}`,
+      severity: "warn",
+      actions: [{ label: "Open output" }],
+      log: (l) => ch.appendLine(l),
+    }).then((picked) => {
+      if (picked === "Open output") {
+        ch.show(true);
+      }
+    });
     pingDeployFinished(
       ch,
       { kind: "signaled", signal: String(result.signal) },
@@ -111,25 +154,32 @@ async function runDeployBackground(
   }
   if (result.exitCode === 0) {
     ch.appendLine(`[deploy finished] exit 0`);
-    void vscode.window.showInformationMessage(
-      `Hotfix deploy finished successfully.`
-    );
+    void notifyMilestone({
+      title: "Hotfix deploy succeeded",
+      subtitle: `env: ${env}`,
+      severity: "info",
+      actions: [{ label: "Open output" }],
+      log: (l) => ch.appendLine(l),
+    }).then((picked) => {
+      if (picked === "Open output") {
+        ch.show(true);
+      }
+    });
     pingDeployFinished(ch, { kind: "success" }, env, sourcePrNumbers);
     return { exitCode: 0, ok: true };
   }
   ch.appendLine(`[deploy finished] exit ${result.exitCode}`);
-  void vscode.window
-    .showErrorMessage(
-      `Hotfix deploy failed (exit ${result.exitCode}). See output "${DEPLOY_OUTPUT_TITLE}".`,
-      "Open output"
-    )
-    .then((sel) => {
-      if (sel === "Open output") {
-        ch.show(true);
-      }
-    });
-  // exitCode can be undefined here (Node's `close` reports `null`); surface
-  // that as `unknown` rather than fabricating a number for the notification.
+  void notifyMilestone({
+    title: "Hotfix deploy FAILED",
+    subtitle: `env: ${env} — exit ${result.exitCode}`,
+    severity: "error",
+    actions: [{ label: "Open output" }],
+    log: (l) => ch.appendLine(l),
+  }).then((picked) => {
+    if (picked === "Open output") {
+      ch.show(true);
+    }
+  });
   pingDeployFinished(
     ch,
     result.exitCode === undefined
@@ -194,8 +244,10 @@ async function runDeployIntegratedTerminal(
 }
 
 /**
- * Run the composed deploy script for `env`. Uses the same run mode
- * (integratedTerminal / background) as fcli so the user experience is consistent.
+ * Run the composed deploy script for `env`. Mode picked by `getHotfixRunMode`:
+ * `integratedTerminal` only when `fordefiHotfix.debugTerminal` is true (or
+ * when the legacy mode setting still pins it); everything else is the new
+ * transparent path with notification-driven UX.
  *
  * `sourcePrNumbers` is optional; when present it is rendered into the macOS
  * "deploy finished" notification body so a stale ping can be traced back to
@@ -211,11 +263,11 @@ export async function runHotfixDeploy(options: {
   const script = buildDeployShellScript(env, targets);
   const ch = getDeployOutputChannel();
   appendDeployHeader(ch, env, script);
-  ch.show(true);
 
   const mode = getHotfixRunMode();
-  if (mode === "background") {
-    return runDeployBackground(script, cwd, env, sourcePrNumbers);
+  if (mode === "integratedTerminal") {
+    ch.show(true);
+    return runDeployIntegratedTerminal(script, cwd, env, sourcePrNumbers);
   }
-  return runDeployIntegratedTerminal(script, cwd, env, sourcePrNumbers);
+  return runDeployTransparent(script, cwd, env, sourcePrNumbers);
 }

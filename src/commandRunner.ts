@@ -215,6 +215,17 @@ export type SpawnRunOptions = {
   shell?: boolean | string;
   log: (chunk: string) => void;
   captureOutput?: boolean;
+  /** Optional secondary chunk stream — same data as `log`, useful when one
+   *  consumer wants to write to an output channel while another (e.g. a
+   *  prompt detector) inspects it. Called once per chunk. */
+  onChunk?: (chunk: string) => void;
+  /**
+   * Called once with the spawned ChildProcess so the caller can hold a
+   * reference for stdin auto-confirm and SIGTERM-on-Stop. Fires after
+   * `spawn()` succeeds; never called when the spawn itself errors (the
+   * `error` event resolves the promise with `spawnError` instead).
+   */
+  onChild?: (child: cp.ChildProcess) => void;
 };
 
 export type SpawnRunResult = {
@@ -229,7 +240,15 @@ export type SpawnRunResult = {
 export async function runViaSpawn(
   options: SpawnRunOptions
 ): Promise<SpawnRunResult> {
-  const { command, cwd, shell = true, log, captureOutput = false } = options;
+  const {
+    command,
+    cwd,
+    shell = true,
+    log,
+    captureOutput = false,
+    onChunk,
+    onChild,
+  } = options;
 
   return new Promise<SpawnRunResult>((resolve) => {
     let captured = "";
@@ -244,16 +263,32 @@ export async function runViaSpawn(
       windowsHide: true,
     });
 
-    const onChunk = (chunk: Buffer): void => {
+    if (onChild) {
+      try {
+        onChild(child);
+      } catch {
+        // onChild is for the caller's bookkeeping; if it throws (e.g. the
+        // controller already torn down) we don't want to abort the run.
+      }
+    }
+
+    const handleData = (chunk: Buffer): void => {
       const t = chunk.toString();
       if (captureOutput) {
         captured = (captured + t).slice(-OUTPUT_TAIL_LIMIT);
       }
       log(t);
+      if (onChunk) {
+        try {
+          onChunk(t);
+        } catch {
+          // Detector errors must not kill the run.
+        }
+      }
     };
 
-    child.stdout?.on("data", onChunk);
-    child.stderr?.on("data", onChunk);
+    child.stdout?.on("data", handleData);
+    child.stderr?.on("data", handleData);
 
     child.on("error", (err) => {
       spawnError = err;

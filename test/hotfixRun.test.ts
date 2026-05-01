@@ -9,12 +9,13 @@ import {
 } from "../src/hotfixRunHelpers";
 
 describe("parseHotfixRunMode", () => {
-  it("maps background and defaults everything else to integratedTerminal", () => {
+  it("maps explicit values; defaults / unknown collapse to transparent (the new default)", () => {
     expect(parseHotfixRunMode("background")).toBe("background");
     expect(parseHotfixRunMode("integratedTerminal")).toBe("integratedTerminal");
-    expect(parseHotfixRunMode(undefined)).toBe("integratedTerminal");
-    expect(parseHotfixRunMode("")).toBe("integratedTerminal");
-    expect(parseHotfixRunMode("nope")).toBe("integratedTerminal");
+    expect(parseHotfixRunMode("transparent")).toBe("transparent");
+    expect(parseHotfixRunMode(undefined)).toBe("transparent");
+    expect(parseHotfixRunMode("")).toBe("transparent");
+    expect(parseHotfixRunMode("nope")).toBe("transparent");
   });
 });
 

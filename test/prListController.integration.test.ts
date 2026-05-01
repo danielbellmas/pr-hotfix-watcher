@@ -229,20 +229,22 @@ describe("PrListController integration", () => {
     expect(deployArgs.env).toBe("pre");
     expect(deployArgs.targets.repoSlug).toBe("acme/workflows");
 
+    // Phase-aware abort: Stop during deploy clears local state immediately
+    // (the dispatched workflow run on GitHub is left as-is and warned about).
     provider.stopWatch();
-    expect(provider.getViewState().deployRunning).toBe(true);
-    expect(provider.getWatching()).toBe(true);
-
-    deploy.resolve({ exitCode: 0, ok: true });
-
-    await waitFor(() => provider.getWatching() === false, {
-      label: "watch cleared after deploy",
-    });
     expect(provider.getViewState().deployRunning).toBe(false);
+    expect(provider.getWatching()).toBe(false);
     expect(getLatestDeployRunningContext()).toBe(false);
+
+    // Resolve the orchestrator's pending await so the test doesn't leak a
+    // dangling promise; calling stop() again from applyDeployOutcome is a
+    // no-op so this stays clean.
+    deploy.resolve({ exitCode: 0, ok: true });
+    await new Promise<void>((r) => setTimeout(r, 5));
+    expect(provider.getWatching()).toBe(false);
   });
 
-  it("stop during deploy is honest: state is not cleared while deploy is awaiting", async () => {
+  it("stop during deploy: phase-aware abort clears state and warns about the dispatched run", async () => {
     global.fetch = makeFetchStub({
       [pullPath("acme", "app", 100)]: [
         {
@@ -280,22 +282,25 @@ describe("PrListController integration", () => {
     await waitFor(() => provider.getViewState().deployRunning === true, {
       label: "deployRunning=true",
     });
-    const statusBefore = provider.getStatusMessage();
 
-    const infoCallsBefore = getFakes().info.mock.calls.length;
+    const warnCallsBefore = getFakes().warn.mock.calls.length;
     provider.stopWatch();
-    expect(provider.getViewState().deployRunning).toBe(true);
-    expect(provider.getWatching()).toBe(true);
-    expect(provider.getStatusMessage()).toBe(statusBefore);
-    const newInfoCalls = getFakes()
-      .info.mock.calls.slice(infoCallsBefore)
+    // New behaviour: Stop is honored mid-deploy.
+    expect(provider.getViewState().deployRunning).toBe(false);
+    expect(provider.getWatching()).toBe(false);
+    expect(provider.getStatusMessage()).toBe("");
+    const newWarnCalls = getFakes()
+      .warn.mock.calls.slice(warnCallsBefore)
       .map((c) => String(c[0]));
+    // The warning explains the dispatched GitHub run is not auto-cancelled.
     expect(
-      newInfoCalls.some((m) => /Stop ignored.*deploy/i.test(m))
+      newWarnCalls.some((m) => /Stop pressed during deploy/i.test(m))
     ).toBe(true);
 
+    // Drain the orchestrator's still-pending await so the test exits cleanly.
     deploy.resolve({ exitCode: 0, ok: true });
-    await waitFor(() => provider.getWatching() === false);
+    await new Promise<void>((r) => setTimeout(r, 5));
+    expect(provider.getWatching()).toBe(false);
   });
 
   it("fcli non-zero exit: deploy is skipped and an error toast fires", async () => {

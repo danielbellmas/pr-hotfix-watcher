@@ -17,6 +17,10 @@ import {
   parseHotfixPrUrl,
   truncateRunLogTail,
 } from "./hotfixRunHelpers";
+import { notifyMilestone } from "./notifyMilestone";
+import { PromptDetector } from "./promptDetector";
+import { registerActiveChild, unregisterActiveChild } from "./runRegistry";
+import { isYubikeyAgentRunning } from "./yubikeyAgentDetect";
 
 const OUTPUT_TITLE = "Fordefi Hotfix CLI";
 
@@ -46,51 +50,6 @@ function appendRunHeader(
   ch.appendLine(`Merged PRs: ${prs}`);
   ch.appendLine(`$ ${command}`);
   ch.appendLine("");
-}
-
-function notifySpawnClose(
-  prs: string,
-  code: number | null,
-  signal: NodeJS.Signals | null,
-  combined: string,
-  ch: vscode.OutputChannel
-): void {
-  ch.appendLine("");
-  if (signal) {
-    ch.appendLine(`[hotfix-cli finished] signal ${signal}`);
-    void vscode.window
-      .showWarningMessage(
-        `Hotfix CLI stopped (signal ${String(
-          signal
-        )}) for ${prs}. See output "${OUTPUT_TITLE}".`,
-        "Open output"
-      )
-      .then((sel) => {
-        if (sel === "Open output") {
-          ch.show(true);
-        }
-      });
-  } else if (code === 0) {
-    ch.appendLine("[hotfix-cli finished] exit 0");
-    void vscode.window.showInformationMessage(
-      `Hotfix CLI finished successfully for ${prs}.`
-    );
-  } else {
-    ch.appendLine(`[hotfix-cli finished] exit ${code}`);
-    const snippet = truncateRunLogTail(combined, 280);
-    void vscode.window
-      .showErrorMessage(
-        `Hotfix CLI failed (exit ${code}) for ${prs}.${
-          snippet ? ` — ${snippet}` : ""
-        } See output "${OUTPUT_TITLE}".`,
-        "Open output"
-      )
-      .then((sel) => {
-        if (sel === "Open output") {
-          ch.show(true);
-        }
-      });
-  }
 }
 
 function notifyTerminalEnd(
@@ -138,27 +97,182 @@ type HotfixRunResult = {
   output: string;
 };
 
-async function runHotfixSpawnBackground(
+/**
+ * Transparent-mode run: spawn fcli without a visible terminal, parse its
+ * output for known prompt patterns, and surface them as dual-fired
+ * notifications. Auto-respond `y\n` to the first `[y/n]` (silent), surface
+ * subsequent prompts as actionable notifications.
+ */
+async function runHotfixTransparent(
   command: string,
   cwd: string,
   prs: string,
   ch: vscode.OutputChannel
 ): Promise<HotfixRunResult> {
+  let yesNoCount = 0;
+  const skipYubikey = isYubikeyAgentRunning();
+  ch.appendLine(
+    `[transparent] starting; yubikey-agent ${
+      skipYubikey ? "detected — touch notifications suppressed" : "not detected"
+    }`
+  );
+
+  let childRef: import("node:child_process").ChildProcess | undefined;
+  const detector = new PromptDetector({
+    onEvent: (ev) => {
+      if (ev.kind === "yubikey_touch_requested") {
+        if (skipYubikey) {
+          ch.appendLine("[prompt] yubikey touch (suppressed: agent detected)");
+          return;
+        }
+        ch.appendLine("[prompt] yubikey touch requested");
+        void notifyMilestone({
+          title: "Touch your YubiKey",
+          subtitle: `Hotfix CLI is waiting for ${prs}`,
+          severity: "warn",
+          actions: [{ label: "Open output" }],
+          log: (l) => ch.appendLine(l),
+        }).then((picked) => {
+          if (picked === "Open output") {
+            ch.show(true);
+          }
+        });
+        return;
+      }
+      if (ev.kind === "conflict_detected") {
+        ch.appendLine(`[prompt] conflict detected: ${ev.line}`);
+        void notifyMilestone({
+          title: "Hotfix CLI hit a merge conflict",
+          subtitle: `${prs} — needs manual resolution in the worktree`,
+          body: ev.line.slice(0, 240),
+          severity: "error",
+          actions: [
+            { label: "Open worktree terminal" },
+            { label: "Open output" },
+          ],
+          log: (l) => ch.appendLine(l),
+        }).then((picked) => {
+          if (picked === "Open worktree terminal") {
+            void vscode.commands.executeCommand(
+              "fordefiHotfix.openWorktreeTerminal",
+              cwd
+            );
+          } else if (picked === "Open output") {
+            ch.show(true);
+          }
+        });
+        return;
+      }
+      if (ev.kind === "yes_no_prompt") {
+        yesNoCount += 1;
+        if (yesNoCount === 1 && getHotfixTerminalAutoFirstConfirm()) {
+          // Auto-respond silently; this matches the integrated-terminal
+          // auto-first-confirm behaviour so transparent mode is feature-parity.
+          const text = getHotfixTerminalAutoFirstConfirmText();
+          const payload = /[\r\n]/.test(text) ? text : `${text}\n`;
+          const stdin = childRef?.stdin;
+          if (stdin && !stdin.destroyed && stdin.writable) {
+            try {
+              stdin.write(payload);
+              ch.appendLine(`[auto-confirm] sent ${JSON.stringify(text)}`);
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              ch.appendLine(`[auto-confirm] write failed: ${msg}`);
+            }
+          } else {
+            ch.appendLine("[auto-confirm] stdin not writable");
+          }
+          return;
+        }
+        ch.appendLine(
+          `[prompt] additional [y/n] prompt #${yesNoCount}: ${ev.line.trim()}`
+        );
+        void notifyMilestone({
+          title: "Hotfix CLI is waiting on a prompt",
+          subtitle: `${prs} — open the output channel to see what it's asking`,
+          body: ev.line.trim().slice(0, 240),
+          severity: "warn",
+          actions: [{ label: "Open output" }],
+          log: (l) => ch.appendLine(l),
+        }).then((picked) => {
+          if (picked === "Open output") {
+            ch.show(true);
+          }
+        });
+        return;
+      }
+      if (ev.kind === "error_line") {
+        ch.appendLine(`[prompt] error line: ${ev.line.trim()}`);
+      }
+    },
+  });
+
   const result = await runViaSpawn({
     command,
     cwd,
     shell: true,
     captureOutput: true,
     log: (chunk) => ch.append(chunk),
+    onChunk: (chunk) => detector.push(chunk),
+    onChild: (child) => {
+      childRef = child;
+      registerActiveChild("fcli", child);
+    },
   });
+  unregisterActiveChild("fcli");
+
   if (result.spawnError) {
     ch.appendLine(`[could not start process] ${result.spawnError.message}`);
-    void vscode.window.showErrorMessage(
-      `Hotfix CLI could not start for ${prs}: ${result.spawnError.message}`
-    );
+    void notifyMilestone({
+      title: "Hotfix CLI did not start",
+      subtitle: `${prs}`,
+      body: result.spawnError.message,
+      severity: "error",
+      actions: [{ label: "Open output" }],
+      log: (l) => ch.appendLine(l),
+    }).then((picked) => {
+      if (picked === "Open output") {
+        ch.show(true);
+      }
+    });
     return { exitCode: undefined, output: result.output };
   }
-  notifySpawnClose(prs, result.exitCode ?? null, result.signal, result.output, ch);
+  if (result.signal) {
+    ch.appendLine(`[hotfix-cli stopped] signal ${result.signal}`);
+    void notifyMilestone({
+      title: "Hotfix CLI stopped",
+      subtitle: `${prs} — signal ${String(result.signal)}`,
+      severity: "warn",
+      actions: [{ label: "Open output" }],
+      log: (l) => ch.appendLine(l),
+    }).then((picked) => {
+      if (picked === "Open output") {
+        ch.show(true);
+      }
+    });
+    return { exitCode: undefined, output: result.output };
+  }
+  if (result.exitCode === 0) {
+    ch.appendLine(`[hotfix-cli finished] exit 0`);
+    // Success milestone fires later after the orchestrator parses the JSON
+    // (we want the toast to mention the resulting hotfix PR). Only notify
+    // here as a low-key info ping when nothing was parseable.
+    return { exitCode: 0, output: result.output };
+  }
+  const snippet = truncateRunLogTail(result.output, 280);
+  ch.appendLine(`[hotfix-cli finished] exit ${result.exitCode}`);
+  void notifyMilestone({
+    title: "Hotfix CLI failed",
+    subtitle: `${prs} — exit ${result.exitCode}`,
+    body: snippet || undefined,
+    severity: "error",
+    actions: [{ label: "Open output" }],
+    log: (l) => ch.appendLine(l),
+  }).then((picked) => {
+    if (picked === "Open output") {
+      ch.show(true);
+    }
+  });
   return { exitCode: result.exitCode, output: result.output };
 }
 
@@ -238,8 +352,9 @@ export type WorktreeRunContext = {
 
 /**
  * Runs the configured hotfix shell command after all watched PRs merged.
- * Mode `integratedTerminal` (default): real terminal for YubiKey / prompts; toasts when shell integration reports exit.
- * Mode `background`: spawn in extension host; streams to output channel.
+ * Default mode is **transparent**: silent spawn + prompt-detection +
+ * dual-fired notifications. The user can opt into the visible
+ * `integratedTerminal` debug flow via `fordefiHotfix.debugTerminal`.
  */
 export async function runHotfixShellCommandAfterMerge(options: {
   command: string;
@@ -262,19 +377,79 @@ export async function runHotfixShellCommandAfterMerge(options: {
       `[worktree] using ${cwd}${worktree?.created ? " (created)" : ""}`
     );
   }
-  ch.show(true);
-
-  maybeNotifyFirstWorktreeCreation(cwd, worktree);
 
   const mode = getHotfixRunMode();
+  // Only the legacy debug flow auto-pops the output panel; transparent mode
+  // keeps the channel populated silently and only surfaces it when the user
+  // clicks "Open output" on a notification.
+  if (mode === "integratedTerminal") {
+    ch.show(true);
+  }
+
+  maybeNotifyFirstWorktreeCreation(cwd, worktree, mode === "integratedTerminal");
+
   const raw =
-    mode === "background"
-      ? await runHotfixSpawnBackground(command, cwd, prs, ch)
-      : await runHotfixIntegratedTerminal(command, cwd, prs, ch);
+    mode === "integratedTerminal"
+      ? await runHotfixIntegratedTerminal(command, cwd, prs, ch)
+      : await runHotfixTransparent(command, cwd, prs, ch);
 
   const hotfixPrs = parseHotfixCliJson(raw.output);
   const hotfixPrUrl =
     hotfixPrs?.[0]?.htmlUrl ?? parseHotfixPrUrl(raw.output);
+
+  if (mode !== "integratedTerminal" && raw.exitCode === 0) {
+    // Transparent-mode success milestone — fired here so we can include the
+    // resolved PR URL when -o json was honored, falling back to a generic
+    // success line otherwise.
+    if (hotfixPrs && hotfixPrs.length > 0) {
+      const list = hotfixPrs
+        .map((e) => `${e.env}:#${e.prNumber}`)
+        .join(", ");
+      const firstUrl = hotfixPrs[0].htmlUrl;
+      void notifyMilestone({
+        title: "Hotfix PR(s) created",
+        subtitle: list,
+        body: `Source ${prs}`,
+        severity: "info",
+        actions: [{ label: "Open PR" }, { label: "Open output" }],
+        log: (l) => ch.appendLine(l),
+      }).then((picked) => {
+        if (picked === "Open PR" && firstUrl) {
+          void vscode.env.openExternal(vscode.Uri.parse(firstUrl));
+        } else if (picked === "Open output") {
+          ch.show(true);
+        }
+      });
+    } else if (hotfixPrUrl) {
+      void notifyMilestone({
+        title: "Hotfix PR created",
+        subtitle: hotfixPrUrl,
+        body: `Source ${prs}`,
+        severity: "info",
+        actions: [{ label: "Open PR" }, { label: "Open output" }],
+        log: (l) => ch.appendLine(l),
+      }).then((picked) => {
+        if (picked === "Open PR") {
+          void vscode.env.openExternal(vscode.Uri.parse(hotfixPrUrl));
+        } else if (picked === "Open output") {
+          ch.show(true);
+        }
+      });
+    } else {
+      void notifyMilestone({
+        title: "Hotfix CLI finished",
+        subtitle: `${prs}`,
+        severity: "info",
+        actions: [{ label: "Open output" }],
+        log: (l) => ch.appendLine(l),
+      }).then((picked) => {
+        if (picked === "Open output") {
+          ch.show(true);
+        }
+      });
+    }
+  }
+
   return {
     exitCode: raw.exitCode,
     ok: raw.exitCode === 0,
@@ -286,7 +461,8 @@ export async function runHotfixShellCommandAfterMerge(options: {
 
 function maybeNotifyFirstWorktreeCreation(
   cwd: string,
-  worktree: WorktreeRunContext | undefined
+  worktree: WorktreeRunContext | undefined,
+  isVisibleTerminal: boolean
 ): void {
   if (!worktree?.created || worktree.fallback) {
     return;
@@ -299,7 +475,12 @@ function maybeNotifyFirstWorktreeCreation(
     }
     void gs.update(key, true);
   }
-  void vscode.window.showInformationMessage(
-    `Created hotfix worktree at ${cwd}. Touch your YubiKey when prompted in the Hotfix CLI terminal.`
-  );
+  // Wording differs depending on whether the user is about to see a real
+  // terminal pop open: in transparent mode there's no terminal to "watch
+  // for", so the YubiKey hint is the active-notification, not a hint about
+  // a panel.
+  const message = isVisibleTerminal
+    ? `Created hotfix worktree at ${cwd}. Touch your YubiKey when prompted in the Hotfix CLI terminal.`
+    : `Created hotfix worktree at ${cwd}. The hotfix run is starting in the background; you'll be notified when a YubiKey touch or other action is needed.`;
+  void vscode.window.showInformationMessage(message);
 }

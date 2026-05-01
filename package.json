@@ -74,6 +74,16 @@
         "command": "fordefiHotfix.doctor",
         "category": "Hotfix",
         "title": "Doctor (diagnose fresh-install setup)"
+      },
+      {
+        "command": "fordefiHotfix.toggleDebugTerminal",
+        "category": "Hotfix",
+        "title": "Toggle debug terminal mode"
+      },
+      {
+        "command": "fordefiHotfix.openWorktreeTerminal",
+        "category": "Hotfix",
+        "title": "Open hotfix worktree terminal"
       }
     ],
     "menus": {
@@ -90,7 +100,7 @@
         },
         {
           "command": "fordefiHotfix.stopWatch",
-          "when": "view == fordefiHotfix.prList && !fordefiHotfix.deployRunning",
+          "when": "view == fordefiHotfix.prList",
           "group": "navigation@3"
         }
       ],
@@ -110,6 +120,14 @@
         {
           "command": "fordefiHotfix.doctor",
           "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.toggleDebugTerminal",
+          "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.openWorktreeTerminal",
+          "when": "false"
         }
       ]
     },
@@ -162,14 +180,20 @@
           "default": "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
           "markdownDescription": "Shell command run after every selected PR is merged. Must include `{prNumbers}`.\n\nPlaceholders:\n- `{repoRoot}` — value of **Repo root**\n- `{prNumbers}` — space-separated PR numbers, ascending\n- `{prList}` — comma-separated PR numbers\n- `{owner}` / `{repo}` — from **Owner** / **Repo**\n- `{hotfixSuffix}` — fcli flags built from the **Hotfix CLI** row (env, draft, critical fast track)"
         },
+        "fordefiHotfix.debugTerminal": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When **off** (default) the hotfix command runs in **transparent mode**: no terminal panel opens, output goes to the *Fordefi Hotfix CLI* output channel silently, and the user only sees notifications for actions (YubiKey touch, merge conflict, fatal error) and milestones (hotfix PR created, deploy started/finished). When **on**, the command runs in a visible integrated terminal — the legacy debug flow — so you can watch every line, intervene by hand, and answer prompts directly. Use the **Hotfix: Toggle debug terminal mode** command or the status-bar item to flip this on the fly."
+        },
         "fordefiHotfix.hotfixRunMode": {
           "type": "string",
           "enum": [
             "integratedTerminal",
-            "background"
+            "background",
+            "transparent"
           ],
-          "default": "integratedTerminal",
-          "markdownDescription": "How to run the hotfix command after merges.\n\n- **integratedTerminal** — real terminal so you can touch a YubiKey and answer prompts (e.g. press `y`); success/failure toasts use shell integration when available.\n- **background** — run via the extension host (no TTY); only suitable for fully non-interactive scripts."
+          "default": "transparent",
+          "markdownDescription": "**Deprecated — prefer `fordefiHotfix.debugTerminal` instead.** How to run the hotfix command after merges.\n\n- **transparent** (default) — silent spawn; user is only notified for actions / milestones.\n- **integratedTerminal** — real terminal you can interact with (debug mode).\n- **background** — legacy spawn without prompt detection; treated as `transparent` going forward.\n\nWhen `debugTerminal` is `true` the run always uses `integratedTerminal` regardless of this setting."
         },
         "fordefiHotfix.hotfixTerminalName": {
           "type": "string",

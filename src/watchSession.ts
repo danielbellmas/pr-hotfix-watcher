@@ -22,6 +22,7 @@ import {
   type HotfixShellRunResult,
 } from "./hotfixRun";
 import { parseGithubPullUrl } from "./hotfixRunHelpers";
+import { killActiveChild } from "./runRegistry";
 import { phaseFromSettledPulls } from "./watchPoll";
 import { MergeHandoffGate } from "./watchPollGuard";
 import { ensureHotfixWorktree } from "./worktreeManager";
@@ -112,6 +113,17 @@ export class WatchSession {
   private statusMessage = "";
   private lastDeployRunningContext = false;
   private consecutivePollErrors = 0;
+  /**
+   * Sticky abort flag flipped by `stop()`. Read by `handleAllMerged` /
+   * `handleDeployAfterFcli` after every await so a Stop pressed mid-fcli or
+   * mid-deploy short-circuits everything downstream — orchestrator hooks
+   * already look at `abortFlag.aborted`, this mirror lets us bail before we
+   * ever reach the orchestrator.
+   */
+  private aborted = false;
+  /** Reference shared with the active orchestrator so abort signals reach
+   *  the in-flight `watchHotfixPrMerge` loop too. */
+  private currentDeployAbort: { aborted: boolean } | null = null;
 
   constructor(private readonly deps: WatchSessionDeps) {}
 
@@ -132,6 +144,7 @@ export class WatchSession {
     this.watchCtx = { cli: { ...cli }, prNumbers: [...prNumbers] };
     this.watchTarget = [...prNumbers];
     this.watching = true;
+    this.aborted = false;
     this.pollGate.reset();
     this.deployRunning = false;
     this.watchEntries = initialEntries.map((e) => ({ ...e }));
@@ -144,21 +157,41 @@ export class WatchSession {
     );
   }
 
-  /** No-op while `deployRunning` — the workflow run already exists on GitHub
-   *  and there's nothing useful to cancel. */
+  /**
+   * Phase-aware abort. Always cancels the current state regardless of which
+   * phase the session is in:
+   *   - merge-watching: clears the poll timer
+   *   - fcli running: SIGTERM the fcli child via the run registry
+   *   - hotfix-PR watching: flips the orchestrator's abort flag
+   *   - deploy running: SIGTERM the deploy child (the `gh workflow run` script
+   *     itself), and flip the orchestrator abort so it doesn't loop into the
+   *     next env
+   *
+   * The dispatched GitHub Actions run is left alone — cancelling it requires
+   * the run id which the bash dispatch script doesn't surface back to us, and
+   * silently cancelling the wrong run id would be worse than leaving the user
+   * to do it via `gh run list` / the GitHub UI. The notification path makes
+   * that clear.
+   */
   stop(): void {
-    if (this.deployRunning) {
-      this.deps.ui.info(
-        "Stop ignored: a hotfix deploy workflow is already dispatched on GitHub."
-      );
-      return;
-    }
+    this.aborted = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
       this.pollTimer = undefined;
     }
+    // Kill any registered children (no-op when nothing is running).
+    killActiveChild("fcli");
+    killActiveChild("deploy");
     if (this.deployPhase) {
       this.deployPhase.abort.aborted = true;
+    }
+    if (this.currentDeployAbort) {
+      this.currentDeployAbort.aborted = true;
+    }
+    if (this.deployRunning) {
+      this.deps.ui.warn(
+        "Stop pressed during deploy: local script terminated. The dispatched workflow run on GitHub is NOT cancelled — use `gh run list` / the Actions UI if you need to stop it remotely."
+      );
     }
     this.watching = false;
     this.watchTarget = [];
@@ -166,6 +199,7 @@ export class WatchSession {
     this.statusMessage = "";
     this.deployPhase = null;
     this.watchCtx = null;
+    this.deployRunning = false;
     this.pollGate.reset();
     this.deps.onChange();
   }
@@ -368,6 +402,10 @@ export class WatchSession {
           : undefined,
       },
     });
+    if (this.aborted) {
+      // User pressed Stop during fcli; don't proceed into the deploy phase.
+      return;
+    }
     if (deploy) {
       await this.handleDeployAfterFcli({
         runResult,
@@ -385,7 +423,8 @@ export class WatchSession {
     sourcePrNumbers: readonly number[];
   }): Promise<void> {
     const { runResult, env, cwd, sourcePrNumbers } = params;
-    const abort = { aborted: false };
+    const abort = { aborted: this.aborted };
+    this.currentDeployAbort = abort;
     const { owner: fallbackOwner, repo: fallbackRepo } = getRepoConfig();
     const wf = getWorkflowsRepoConfig();
     const workflowsTargets = {
@@ -447,15 +486,15 @@ export class WatchSession {
           },
           onDeployDispatchStart: (dispatchEnv) => {
             this.deployRunning = true;
+            // Phase-aware Stop now terminates the local dispatch script
+            // mid-flight too — surface that fact in the live status line so
+            // users don't think Stop is locked. The "Hotfix deploy started"
+            // milestone notification is fired from the deploy runner itself
+            // (transparent / debug); we deliberately don't double-fire here.
             this.statusMessage = `Hotfix PR merged. Dispatching ${describeEnvShort(
               dispatchEnv
-            )} workflow(s). Stop is disabled while a run is in flight.`;
+            )} workflow(s) — press Stop to abort the local script.`;
             this.deps.onChange();
-            this.deps.ui.info(
-              `Hotfix PR merged. Dispatching ${describeEnvShort(
-                dispatchEnv
-              )} workflow(s)…`
-            );
           },
           onDeployDispatchEnd: () => {
             this.deployRunning = false;
@@ -465,6 +504,7 @@ export class WatchSession {
       },
     });
 
+    this.currentDeployAbort = null;
     this.applyDeployOutcome(result);
   }
 

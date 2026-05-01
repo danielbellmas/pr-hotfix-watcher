@@ -1,7 +1,27 @@
-export type HotfixRunMode = "integratedTerminal" | "background";
+/**
+ * Run mode for the post-merge hotfix command.
+ *
+ * - `transparent` (new default): spawn the child without a visible terminal,
+ *   stream output to a hidden output channel, surface YubiKey / conflict /
+ *   `[y/n]` prompts as dual-fired notifications. The user-facing toggle is the
+ *   `fordefiHotfix.debugTerminal` setting (false → transparent).
+ * - `integratedTerminal`: the original visible-terminal flow, kept as the
+ *   debug escape hatch (`debugTerminal: true`). YubiKey and `[y/n]` prompts
+ *   are visible in the terminal exactly as before.
+ * - `background`: legacy spawn mode without prompt detection. Retained as a
+ *   value purely for back-compat with users who set
+ *   `fordefiHotfix.hotfixRunMode: "background"` in older versions; treated
+ *   identically to `transparent` everywhere we branch on the mode.
+ */
+export type HotfixRunMode =
+  | "integratedTerminal"
+  | "background"
+  | "transparent";
 
 export function parseHotfixRunMode(raw: string | undefined): HotfixRunMode {
-  return raw === "background" ? "background" : "integratedTerminal";
+  if (raw === "integratedTerminal") return "integratedTerminal";
+  if (raw === "background") return "background";
+  return "transparent";
 }
 
 /** Last segment of text for short error toasts (single line-ish). */

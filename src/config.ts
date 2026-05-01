@@ -233,11 +233,42 @@ export function getHotfixTerminalAutoFirstConfirmDelayMs(): number {
 
 export type { HotfixRunMode };
 
+/**
+ * Resolve the effective run mode from the two settings that govern it.
+ *
+ * `fordefiHotfix.debugTerminal` is the new user-facing toggle; when `true`
+ * the run goes through the visible-integrated-terminal path. Otherwise the
+ * legacy `fordefiHotfix.hotfixRunMode` value is consulted purely for
+ * back-compat: explicit `integratedTerminal` still wins (some users had
+ * pinned it in their settings) and everything else collapses to the new
+ * transparent default.
+ */
 export function getHotfixRunMode(): HotfixRunMode {
-  const raw = vscode.workspace
-    .getConfiguration("fordefiHotfix")
-    .get<string>("hotfixRunMode", "integratedTerminal");
+  const c = vscode.workspace.getConfiguration("fordefiHotfix");
+  if (c.get<boolean>("debugTerminal", false) === true) {
+    return "integratedTerminal";
+  }
+  const raw = c.get<string>("hotfixRunMode", "");
   return parseHotfixRunMode(raw);
+}
+
+export function isDebugTerminalEnabled(): boolean {
+  return Boolean(
+    vscode.workspace
+      .getConfiguration("fordefiHotfix")
+      .get<boolean>("debugTerminal", false)
+  );
+}
+
+/**
+ * Set the new debug-terminal toggle. Updates **global** settings so the
+ * preference follows the user across workspaces (the use-case is "I'm
+ * debugging the watcher right now, regardless of project").
+ */
+export async function setDebugTerminalEnabled(value: boolean): Promise<void> {
+  await vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .update("debugTerminal", value, vscode.ConfigurationTarget.Global);
 }
 
 export function getHotfixTerminalName(): string {
