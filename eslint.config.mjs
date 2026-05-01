@@ -5,6 +5,7 @@ export default tseslint.config(
   {
     ignores: [
       "out/**",
+      "out-test/**",
       "node_modules/**",
       "test/e2e/out/**",
       "*.vsix",
@@ -17,6 +18,10 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
+      parserOptions: {
+        project: ["./tsconfig.json", "./tsconfig.test.json", "./test/e2e/tsconfig.json"],
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: {
       "@typescript-eslint/no-unused-vars": [
@@ -28,6 +33,7 @@ export default tseslint.config(
         },
       ],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-floating-promises": "error",
       "no-console": "off",
       "prefer-const": "error",
       eqeqeq: ["error", "always", { null: "ignore" }],

@@ -134,10 +134,12 @@ sequenceDiagram
   end
 ```
 
-**Run mode** (`fordefiHotfix.hotfixRunMode`) decides where the post-merge command executes:
+**Run mode** (`fordefiHotfix.debugTerminal`) decides where the post-merge command executes:
 
-- **`integratedTerminal`** (default): a real terminal so YubiKey / `[y/n]` prompts work; toasts use shell integration to read the exit code when available.
-- **`background`**: `child_process.spawn` in the extension host; no TTY, suitable only for fully non-interactive scripts.
+- **`false`** (default, transparent mode): silent spawn; output goes to the *Fordefi Hotfix CLI* output channel; user sees only action prompts (YubiKey, conflict) and milestone notifications.
+- **`true`** (debug terminal mode): a real integrated terminal so you can watch every line, interact with prompts, and answer YubiKey / `[y/n]` directly.
+
+The deprecated `fordefiHotfix.hotfixRunMode` setting still works but `debugTerminal` takes precedence.
 
 Full logs: **View → Output → "Fordefi Hotfix CLI"** (and **"Fordefi Hotfix Deploy"** when the deploy phase runs).
 
@@ -149,7 +151,7 @@ Full logs: **View → Output → "Fordefi Hotfix CLI"** (and **"Fordefi Hotfix D
 |------|------------|--------|
 | Hotfix CLI row (env, draft, critical fast track) | Yes | `workspaceState` `fordefiHotfix.hotfixCliView` |
 | PR filter + sort | Yes | `workspaceState` `fordefiHotfix.prListView` |
-| Checkbox selection | No (today) | In memory until reload |
+| Checkbox selection | Yes | `workspaceState` `fordefiHotfix.selectedPrs` |
 | Search query | No | In memory |
 | GitHub PAT override | Yes | Secret Storage |
 | Owner, repo, templates, etc. | Yes | VS Code settings |

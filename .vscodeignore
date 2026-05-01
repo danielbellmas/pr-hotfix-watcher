@@ -3,10 +3,13 @@
 src/**
 test/**
 scripts/**
+docs/**
+out-test/**
 .gitignore
 .yarnrc
 eslint.config.*
-**/tsconfig.json
+vitest.config.*
+**/tsconfig*.json
 **/*.map
 **/*.ts
 .github/**

@@ -83,7 +83,7 @@ describe("TokenResolver.resolve — priority chain", () => {
   });
 
   it("uses configured ghPath as the executable when non-empty", async () => {
-    const exec = vi.fn(() => "tok");
+    const exec = vi.fn((_file: string, _args: string[], _timeout: number) => "tok" as string | undefined);
     const deps = makeDeps({
       exec,
       config: { ghPath: () => " /opt/homebrew/bin/gh ", githubPat: () => "" },
@@ -94,7 +94,7 @@ describe("TokenResolver.resolve — priority chain", () => {
   });
 
   it("defaults to 'gh' on empty ghPath", async () => {
-    const exec = vi.fn(() => "tok");
+    const exec = vi.fn((_file: string, _args: string[], _timeout: number) => "tok" as string | undefined);
     const deps = makeDeps({ exec });
     const r = new TokenResolver(deps);
     await r.resolve();

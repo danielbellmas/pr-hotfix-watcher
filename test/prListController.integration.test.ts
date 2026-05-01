@@ -79,8 +79,10 @@ import { buildPull, makeFetchStub, pullPath } from "./_util/githubStubs";
 import { invalidateGhTokenCache } from "../src/config";
 import { runHotfixDeploy } from "../src/deployRun";
 import { runHotfixShellCommandAfterMerge } from "../src/hotfixRun";
+import type { ExtensionContext } from "vscode";
 import { PrListController } from "../src/prListController";
 
+const fakeCtx = () => makeFakeExtensionContext() as unknown as ExtensionContext;
 const mockedRunFcli = vi.mocked(runHotfixShellCommandAfterMerge);
 const mockedRunDeploy = vi.mocked(runHotfixDeploy);
 const mockedExecFile = vi.mocked(cp.execFile);
@@ -206,7 +208,7 @@ describe("PrListController integration", () => {
     const deploy = deferred<{ exitCode: number; ok: boolean }>();
     mockedRunDeploy.mockImplementation(async () => deploy.promise);
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(100, true);
     provider.setCheckboxState(101, true);
@@ -274,7 +276,7 @@ describe("PrListController integration", () => {
     const deploy = deferred<{ exitCode: number; ok: boolean }>();
     mockedRunDeploy.mockImplementation(async () => deploy.promise);
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(100, true);
     provider.startWatch();
@@ -323,7 +325,7 @@ describe("PrListController integration", () => {
     });
     mockedRunDeploy.mockResolvedValue({ exitCode: 0, ok: true });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(200, true);
     provider.startWatch();
@@ -362,7 +364,7 @@ describe("PrListController integration", () => {
 
     getFakes().inputBox.mockImplementation(async () => undefined);
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(300, true);
     provider.startWatch();
@@ -403,7 +405,7 @@ describe("PrListController integration", () => {
       output: "",
     });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(400, true);
     provider.startWatch();
@@ -440,18 +442,15 @@ describe("PrListController integration", () => {
     });
     getFakes().inputBox.mockImplementation(async () => undefined);
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(500, true);
     provider.startWatch();
 
-    const privateProvider = provider as unknown as {
-      pollOnce(): Promise<void>;
-    };
     await Promise.all([
-      privateProvider.pollOnce(),
-      privateProvider.pollOnce(),
-      privateProvider.pollOnce(),
+      provider.pollOnce(),
+      provider.pollOnce(),
+      provider.pollOnce(),
     ]);
 
     await waitFor(() => mockedRunFcli.mock.calls.length >= 1);
@@ -480,7 +479,7 @@ describe("PrListController integration", () => {
       output: "",
     });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(600, true);
     provider.startWatch();
@@ -520,7 +519,7 @@ describe("PrListController integration", () => {
       output: "",
     });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(800, true);
     provider.startWatch();
@@ -571,7 +570,7 @@ describe("PrListController integration", () => {
     });
     mockedRunDeploy.mockResolvedValue({ exitCode: 0, ok: true });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(850, true);
     provider.startWatch();
@@ -603,7 +602,7 @@ describe("PrListController integration", () => {
       ],
     });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(870, true);
     provider.startWatch();
@@ -650,7 +649,7 @@ describe("PrListController integration", () => {
     });
     mockedRunDeploy.mockResolvedValue({ exitCode: 7, ok: false });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: true, env: "pre" });
     provider.setCheckboxState(880, true);
     provider.startWatch();
@@ -678,7 +677,7 @@ describe("PrListController integration", () => {
       ],
     });
 
-    const provider = new PrListController(makeFakeExtensionContext());
+    const provider = new PrListController(fakeCtx());
     provider.setHotfixCliOptions({ deploy: false, env: "pre" });
     provider.setCheckboxState(700, true);
     provider.startWatch();

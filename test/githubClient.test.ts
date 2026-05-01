@@ -131,7 +131,7 @@ function stubFetchOnce(
   const calls: { url: string; init?: RequestInit }[] = [];
   const original = globalThis.fetch;
   globalThis.fetch = (async (
-    input: RequestInfo | URL,
+    input: string | URL,
     init?: RequestInit
   ) => {
     calls.push({ url: String(input), init });

@@ -288,13 +288,14 @@
   "scripts": {
     "vscode:prepublish": "npm run verify",
     "compile": "tsc -p ./",
+    "typecheck:test": "tsc -p tsconfig.test.json",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e:compile": "tsc -p test/e2e/tsconfig.json",
     "test:e2e": "npm run compile && npm run test:e2e:compile && node test/e2e/out/runTest.js",
-    "verify": "npm run lint && npm run compile && npm run test",
+    "verify": "npm run lint && npm run compile && npm run typecheck:test && npm run test",
     "verify:install": "scripts/verify-install.sh",
     "package": "vsce package"
   },

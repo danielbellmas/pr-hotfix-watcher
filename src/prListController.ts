@@ -83,6 +83,8 @@ export type HotfixPrViewState = {
   deployRunning: boolean;
 };
 
+const SELECTED_PRS_KEY = "fordefiHotfix.selectedPrs";
+
 export class PrListController {
   private _onDidChangeTreeData = new vscode.EventEmitter<
     PrRow | undefined | void
@@ -112,6 +114,12 @@ export class PrListController {
   private readonly watchSession: WatchSession;
 
   constructor(private readonly context: vscode.ExtensionContext) {
+    const savedSelected =
+      this.context.workspaceState.get<number[]>(SELECTED_PRS_KEY);
+    if (savedSelected?.length) {
+      for (const n of savedSelected) this.selected.add(n);
+    }
+
     const saved = this.context.workspaceState.get<Partial<HotfixCliOptions>>(
       "fordefiHotfix.hotfixCliView"
     );
@@ -129,6 +137,13 @@ export class PrListController {
       resolveToken: () => resolveGitHubToken(this.context),
       globalState: this.context.globalState,
     });
+  }
+
+  private persistSelected(): void {
+    void this.context.workspaceState.update(
+      SELECTED_PRS_KEY,
+      this.selected.size > 0 ? [...this.selected] : undefined
+    );
   }
 
   getWatching(): boolean {
@@ -354,6 +369,7 @@ export class PrListController {
     } else {
       this.selected.delete(prNumber);
     }
+    this.persistSelected();
     this._onDidChangeTreeData.fire();
   }
 
@@ -424,11 +440,14 @@ export class PrListController {
           });
         }
         this.rows = nextRows;
+        let pruned = false;
         for (const n of [...this.selected]) {
           if (!nextRows.some((r) => r.number === n)) {
             this.selected.delete(n);
+            pruned = true;
           }
         }
+        if (pruned) this.persistSelected();
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.loadError = msg;
@@ -455,8 +474,6 @@ export class PrListController {
       );
       return;
     }
-    // Deep-copy so subsequent `setHotfixCliOptions` calls (env/deploy toggles)
-    // cannot mutate the in-flight watch.
     const frozenCli: HotfixCliOptions = { ...this.hotfixCli };
     try {
       buildHotfixCommand(nums, frozenCli);
@@ -474,6 +491,10 @@ export class PrListController {
         merged: Boolean(row?.mergedAt),
       };
     });
+
+    this.selected.clear();
+    this.persistSelected();
+
     this.watchSession.start({
       prNumbers: nums,
       cli: frozenCli,
@@ -485,8 +506,8 @@ export class PrListController {
     this.watchSession.stop();
   }
 
-  /** Exposed for the integration test only (cast through `unknown`). */
-  private pollOnce(): Promise<void> {
+  /** @internal — exposed for integration tests. Not part of the public API. */
+  pollOnce(): Promise<void> {
     return this.watchSession.pollOnce();
   }
 }

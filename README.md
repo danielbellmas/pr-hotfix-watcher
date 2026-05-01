@@ -32,11 +32,13 @@ All settings live under **Hotfix** in `Settings → Extensions → Fordefi Hotfi
 | ID | Default | Purpose |
 |----|---------|---------|
 | `fordefiHotfix.owner` / `.repo` | `arnac-io` / `arnac` | Target GitHub repo |
-| `fordefiHotfix.recentPrCount` | `20` | Latest PRs by update time (max 100) |
+| `fordefiHotfix.recentPrCount` | `30` | Latest PRs by update time (max 100) |
+| `fordefiHotfix.displayPrLimit` | `10` | Max PR rows in the sidebar (checked PRs always stay visible) |
 | `fordefiHotfix.pollIntervalSeconds` | `60` | Merge poll interval while watching |
 | `fordefiHotfix.repoRoot` | `""` | Clone path (empty = first workspace folder) |
 | `fordefiHotfix.commandTemplate` | see `package.json` | Must contain `{prNumbers}`. Also: `{repoRoot}`, `{prList}`, `{owner}`, `{repo}`, `{hotfixSuffix}` |
-| `fordefiHotfix.hotfixRunMode` | `integratedTerminal` | `integratedTerminal` (YubiKey-friendly) or `background` |
+| `fordefiHotfix.debugTerminal` | `false` | `false` = transparent (silent, notifications only); `true` = integrated terminal (YubiKey-friendly, interactive) |
+| `fordefiHotfix.hotfixRunMode` | `transparent` | **Deprecated** — prefer `debugTerminal`. `transparent` / `integratedTerminal` / `background` |
 | `fordefiHotfix.hotfixTerminalName` | `Hotfix CLI` | Terminal tab name in `integratedTerminal` mode |
 | `fordefiHotfix.hotfixEnv` | `pre` | Default for the **env** dropdown (`pre`, `prod`, `both`) |
 | `fordefiHotfix.hotfixDraft` | `false` | Default for the **draft** checkbox |
@@ -156,10 +158,10 @@ The wrapper script typically runs `direnv exec . python …` when not already in
 
 ## Development
 
-Sources live under `~/scripts/fordefi-hotfix-watcher`:
+Sources live under `~/scripts/hotfix-watcher`:
 
 ```bash
-cd ~/scripts/fordefi-hotfix-watcher
+cd ~/scripts/hotfix-watcher
 npm install
 npm run compile
 ```

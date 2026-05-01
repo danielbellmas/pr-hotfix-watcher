@@ -63,8 +63,8 @@ function runResultWith(
 ): HotfixShellRunResult {
   return {
     exitCode: 0,
-    strategy: "background" as const,
-    logTail: "",
+    ok: true,
+    output: "",
     hotfixPrUrl: "https://github.com/acme/service/pull/42",
     ...overrides,
   };
@@ -116,7 +116,7 @@ describe("orchestrateDeployAfterFcli", () => {
   });
 
   it("accepts a user-typed URL from the prompt when fcli did not emit one", async () => {
-    const watchPr = vi.fn(async () => ({ kind: "merged" as const, pull: fakePull }));
+    const watchPr = vi.fn(async (_opts: HotfixPrMergeWatchOptions) => ({ kind: "merged" as const, pull: fakePull }));
     const runDeploy = vi.fn(async (): Promise<DeployRunResult> => ({
       exitCode: 0,
       ok: true,
@@ -373,7 +373,7 @@ describe("orchestrateDeployAfterFcli", () => {
 
     it("dispatches per-env (not the chained 'both' script) when JSON drives the flow", async () => {
       const runDeploy = vi.fn(
-        async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
+        async (_opts: { env: string }): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
       );
       const deps = makeDeps({ runDeploy });
       await orchestrateDeployAfterFcli({
@@ -412,7 +412,7 @@ describe("orchestrateDeployAfterFcli", () => {
 
     it("reorders prod-before-pre payloads into pre→prod for deploy", async () => {
       const runDeploy = vi.fn(
-        async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
+        async (_opts: { env: string }): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
       );
       const deps = makeDeps({ runDeploy });
       await orchestrateDeployAfterFcli({
@@ -494,7 +494,7 @@ describe("orchestrateDeployAfterFcli", () => {
 
     it("falls back to the regex URL path when hotfixPrs is empty", async () => {
       const runDeploy = vi.fn(
-        async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
+        async (_opts: { env: string }): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
       );
       const deps = makeDeps({ runDeploy });
       const result = await orchestrateDeployAfterFcli({
