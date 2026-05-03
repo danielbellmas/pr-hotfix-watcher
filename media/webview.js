@@ -247,33 +247,39 @@
         );
       })
       .join("");
+  }
 
-    list.querySelectorAll('input[data-role="cb"]').forEach((el) => {
-      el.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-      });
-      el.addEventListener("change", (ev) => {
-        const t = ev.target;
-        const n = Number(t.getAttribute("data-num"));
-        vscode.postMessage({ command: "toggle", number: n });
-      });
-    });
-    list.querySelectorAll("a.title").forEach((a) => {
-      a.addEventListener("click", (ev) => {
+  const listEl = document.getElementById("list");
+  if (listEl) {
+    listEl.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!t || !t.closest) return;
+
+      const link = t.closest("a.title");
+      if (link) {
         ev.preventDefault();
         ev.stopPropagation();
-        const url = a.getAttribute("data-url");
+        const url = link.getAttribute("data-url");
         if (url) vscode.postMessage({ command: "open", url });
-      });
-    });
-    list.querySelectorAll(".card").forEach((c) => {
-      c.addEventListener("click", (ev) => {
-        const t = ev.target;
-        if (t.closest && (t.closest("a") || t.closest("input"))) return;
-        const n = Number(c.getAttribute("data-num"));
+        return;
+      }
+
+      if (t.closest("input")) return;
+
+      const card = t.closest(".card");
+      if (card) {
+        const n = Number(card.getAttribute("data-num"));
         if (!Number.isFinite(n) || n <= 0) return;
         vscode.postMessage({ command: "toggle", number: n });
-      });
+      }
+    });
+
+    listEl.addEventListener("change", (ev) => {
+      const t = ev.target;
+      if (t && t.getAttribute && t.getAttribute("data-role") === "cb") {
+        const n = Number(t.getAttribute("data-num"));
+        vscode.postMessage({ command: "toggle", number: n });
+      }
     });
   }
 

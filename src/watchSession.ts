@@ -273,16 +273,19 @@ export class WatchSession {
             r.status === "fulfilled"
         );
         if (allFulfilled) {
-          this.watchEntries = settled.map((r, i) => {
-            const p = r.value;
-            const num = this.watchTarget[i];
-            return {
-              number: num ?? 0,
-              title: p.title,
-              state: p.state,
-              merged: Boolean(p.merged_at),
-            };
-          });
+          this.watchEntries = settled
+            .map((r, i) => {
+              const num = this.watchTarget[i];
+              if (num === undefined) return undefined;
+              const p = r.value;
+              return {
+                number: num,
+                title: p.title,
+                state: p.state,
+                merged: Boolean(p.merged_at),
+              };
+            })
+            .filter((e): e is NonNullable<typeof e> => e !== undefined);
         }
         const phase = phaseFromSettledPulls(this.watchTarget, settled);
         if (phase.kind === "stop_404") {
