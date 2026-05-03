@@ -12,7 +12,7 @@
   },
   "engines": {
     "node": ">=22",
-    "vscode": "^1.94.0"
+    "vscode": "^1.118.0"
   },
   "categories": [
     "Other"
@@ -301,6 +301,7 @@
     "test:e2e": "npm run compile && npm run test:e2e:compile && node test/e2e/out/runTest.js",
     "verify": "npm run format:check && npm run lint && npm run compile && npm run typecheck:test && npm run test",
     "verify:install": "scripts/verify-install.sh",
+    "clean": "rm -rf out out-test coverage",
     "package": "vsce package",
     "prepare": "husky"
   },

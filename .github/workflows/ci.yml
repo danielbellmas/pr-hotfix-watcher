@@ -29,11 +29,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Typecheck
+      - name: Typecheck (src)
         run: npm run compile
 
-      - name: Test
-        run: npm test
+      - name: Typecheck (test)
+        run: npm run typecheck:test
+
+      - name: Test with coverage
+        run: npm run test:coverage
 
       - name: Package VSIX
         run: npx --yes @vscode/vsce package --no-dependencies
