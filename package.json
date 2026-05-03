@@ -11,6 +11,7 @@
     "url": "https://github.com/danielbellmas/pr-hotfix-watcher"
   },
   "engines": {
+    "node": ">=22",
     "vscode": "^1.94.0"
   },
   "categories": [
@@ -297,9 +298,10 @@
     "test:watch": "vitest",
     "test:e2e:compile": "tsc -p test/e2e/tsconfig.json",
     "test:e2e": "npm run compile && npm run test:e2e:compile && node test/e2e/out/runTest.js",
-    "verify": "npm run lint && npm run compile && npm run typecheck:test && npm run test",
+    "verify": "npm run format:check && npm run lint && npm run compile && npm run typecheck:test && npm run test",
     "verify:install": "scripts/verify-install.sh",
-    "package": "vsce package"
+    "package": "vsce package",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -309,10 +311,20 @@
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.9.1",
     "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "mocha": "^11.7.5",
     "prettier": "^3.8.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.1",
     "vitest": "^4.1.5"
+  },
+  "lint-staged": {
+    "{src,test}/**/*.ts": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,css,html,yml,yaml,mjs,js}": "prettier --write"
   }
 }
