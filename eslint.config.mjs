@@ -29,6 +29,14 @@ export default tseslint.config(
       ],
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          prefer: "type-imports",
+          fixStyle: "inline-type-imports",
+          disallowTypeAnnotations: false,
+        },
+      ],
       "no-console": "off",
       "prefer-const": "error",
       eqeqeq: ["error", "always", { null: "ignore" }],

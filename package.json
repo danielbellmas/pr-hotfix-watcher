@@ -18,6 +18,9 @@
     "Other"
   ],
   "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:fordefiHotfix.prList"
+  ],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
