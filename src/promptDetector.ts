@@ -26,8 +26,8 @@ export type PromptDetectorOptions = {
   onEvent: (event: DetectedEvent) => void;
 };
 
-// eslint-disable-next-line no-control-regex
-const ANSI_SGR = /\x1b\[[0-9;?]*[A-Za-z]/g;
+const ESC = String.fromCharCode(0x1b);
+const ANSI_SGR = new RegExp(`${ESC}\\[[0-9;?]*[A-Za-z]`, "g");
 
 /**
  * Patterns are intentionally broad to catch wording variants across fcli

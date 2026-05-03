@@ -25,13 +25,13 @@ export function phaseFromSettledPulls(
   const pulls: GitHubPull[] = [];
   for (let i = 0; i < settled.length; i++) {
     const result = settled[i];
-    if (!result) {
+    const prNumber = watchTarget[i];
+    if (!result || prNumber === undefined) {
       return { kind: "poll_error", message: `watch poll: missing result at index ${i}` };
     }
     const phase = phaseFromHotfixSettled(result);
     if (phase.kind === "not_found") {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop-bounded index
-      return { kind: "stop_404", prNumber: watchTarget[i]! };
+      return { kind: "stop_404", prNumber };
     }
     if (phase.kind === "error") {
       return { kind: "poll_error", message: phase.message };

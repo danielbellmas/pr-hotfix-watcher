@@ -83,8 +83,7 @@ export type HotfixPrViewState = {
 const SELECTED_PRS_KEY = "fordefiHotfix.selectedPrs";
 
 export class PrListController {
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-  private _onDidChangeTreeData = new vscode.EventEmitter<PrRow | undefined | void>();
+  private _onDidChangeTreeData = new vscode.EventEmitter<PrRow | undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private rows: PrRow[] = [];
@@ -125,7 +124,7 @@ export class PrListController {
     this.prListView = normalizePrListViewOptions(savedList ?? undefined);
     this.watchSession = new WatchSession({
       ui: createDefaultWatchSessionUi(),
-      onChange: () => this._onDidChangeTreeData.fire(),
+      onChange: () => this._onDidChangeTreeData.fire(undefined),
       resolveToken: () => resolveGitHubToken(this.context),
       globalState: this.context.globalState,
     });
@@ -164,7 +163,7 @@ export class PrListController {
   }
 
   fireChange(): void {
-    this._onDidChangeTreeData.fire();
+    this._onDidChangeTreeData.fire(undefined);
   }
 
   getViewState(): HotfixPrViewState {
@@ -202,7 +201,7 @@ export class PrListController {
     void this.context.workspaceState.update("fordefiHotfix.hotfixCliView", {
       ...this.hotfixCli,
     });
-    this._onDidChangeTreeData.fire();
+    this._onDidChangeTreeData.fire(undefined);
   }
 
   setPrListViewOptions(partial: Partial<PrListViewOptions>): void {
@@ -213,7 +212,7 @@ export class PrListController {
     void this.context.workspaceState.update("fordefiHotfix.prListView", {
       ...this.prListView,
     });
-    this._onDidChangeTreeData.fire();
+    this._onDidChangeTreeData.fire(undefined);
   }
 
   /** Local filter on cached PRs; if nothing matches, debounced `search/issues` for the repo. */
@@ -230,7 +229,7 @@ export class PrListController {
       this.remoteRows = [];
       this.searchRemoteLoading = false;
       this.searchRemoteError = null;
-      this._onDidChangeTreeData.fire();
+      this._onDidChangeTreeData.fire(undefined);
       return;
     }
 
@@ -240,7 +239,7 @@ export class PrListController {
       this.remoteRows = [];
       this.searchRemoteLoading = false;
       this.searchRemoteError = null;
-      this._onDidChangeTreeData.fire();
+      this._onDidChangeTreeData.fire(undefined);
       return;
     }
 
@@ -259,11 +258,11 @@ export class PrListController {
         return;
       }
       this.searchRemoteLoading = true;
-      this._onDidChangeTreeData.fire();
+      this._onDidChangeTreeData.fire(undefined);
       void this.runRepoSearch(trimmed, gen);
     }, 320);
 
-    this._onDidChangeTreeData.fire();
+    this._onDidChangeTreeData.fire(undefined);
   }
 
   private bumpRemoteSearchGen(): void {
@@ -321,7 +320,7 @@ export class PrListController {
     } finally {
       if (gen === this.remoteSearchGen && trimmed === this.searchQuery.trim()) {
         this.searchRemoteLoading = false;
-        this._onDidChangeTreeData.fire();
+        this._onDidChangeTreeData.fire(undefined);
       }
     }
   }
@@ -345,7 +344,7 @@ export class PrListController {
       this.selected.delete(prNumber);
     }
     this.persistSelected();
-    this._onDidChangeTreeData.fire();
+    this._onDidChangeTreeData.fire(undefined);
   }
 
   async refresh(options?: RefreshOptions): Promise<void> {
@@ -356,7 +355,7 @@ export class PrListController {
     }
     if (showListLoading) {
       this.listLoading = true;
-      this._onDidChangeTreeData.fire();
+      this._onDidChangeTreeData.fire(undefined);
     }
     try {
       const token = await resolveGitHubToken(this.context);
@@ -427,7 +426,7 @@ export class PrListController {
     } finally {
       this.listLoading = false;
       this.initialListFetchDone = true;
-      this._onDidChangeTreeData.fire();
+      this._onDidChangeTreeData.fire(undefined);
     }
   }
 

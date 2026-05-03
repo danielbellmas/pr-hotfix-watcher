@@ -35,9 +35,11 @@ export function formatPrLabels(prNumbers: readonly number[]): string {
 }
 
 /** Strip ANSI SGR escape sequences so `HOTFIX_PR_URL=` still parses when fcli colors output. */
+const ESC = String.fromCharCode(0x1b);
+const ANSI_SGR = new RegExp(`${ESC}\\[[0-9;?]*[A-Za-z]`, "g");
+
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
+  return s.replace(ANSI_SGR, "");
 }
 
 const HOTFIX_PR_URL_RE = /HOTFIX_PR_URL\s*=\s*(https?:\/\/github\.com\/[^\s"'<>]+?\/pull\/\d+)/i;
@@ -72,12 +74,12 @@ export function parseGithubPullUrl(url: string): ParsedPrUrl | undefined {
   if (!m) {
     return undefined;
   }
+  const [, owner, repo] = m;
   const prNumber = Number(m[3]);
-  if (!Number.isInteger(prNumber) || prNumber <= 0) {
+  if (!owner || !repo || !Number.isInteger(prNumber) || prNumber <= 0) {
     return undefined;
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex capture groups guaranteed by match
-  return { owner: m[1]!, repo: m[2]!, prNumber };
+  return { owner, repo, prNumber };
 }
 
 /**
@@ -152,9 +154,8 @@ export function parseHotfixCliJson(output: string): HotfixPrEntry[] | undefined 
   }
   const cleaned = stripAnsi(output).replace(/\r\n/g, "\n");
   const lines = cleaned.split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop-bounded index
-    const line = lines[i]!.trim();
+  for (const raw of [...lines].reverse()) {
+    const line = raw.trim();
     if (!line.startsWith("{") || !line.endsWith("}")) {
       continue;
     }
