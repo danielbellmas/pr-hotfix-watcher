@@ -2,9 +2,10 @@
  * PR list filtering for the Hotfix webview: substring / `#` number match on the last refresh,
  * then merge checked PRs so selections stay visible when filtered or when using remote-only hits.
  */
-export function filterPrRowsByQuery<
-  T extends { number: number; title: string }
->(rows: readonly T[], trimmed: string): T[] {
+export function filterPrRowsByQuery<T extends { number: number; title: string }>(
+  rows: readonly T[],
+  trimmed: string
+): T[] {
   const q = trimmed.trim().toLowerCase();
   if (!q) {
     return [...rows];

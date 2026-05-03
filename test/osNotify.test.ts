@@ -198,9 +198,7 @@ describe("buildOsNotificationScript", () => {
       subtitle: 'c"d',
       body: 'e"f',
     });
-    expect(got).toBe(
-      `display notification "e\\"f" with title "a\\"b" subtitle "c\\"d"`
-    );
+    expect(got).toBe(`display notification "e\\"f" with title "a\\"b" subtitle "c\\"d"`);
   });
 
   it("escapes backslashes before quotes (order matters)", () => {

@@ -4,12 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
-import {
-  getGhPath,
-  getRepoConfig,
-  getRepoRoot,
-  getWorktreePostCreateCommand,
-} from "./config";
+import { getGhPath, getRepoConfig, getRepoRoot, getWorktreePostCreateCommand } from "./config";
 import { GITHUB_PAT_SECRET_KEY } from "./tokenResolver";
 import { computeWorktreePath, HOTFIX_WORKTREE_BRANCH } from "./worktreeManager";
 
@@ -23,9 +18,7 @@ const execFileAsync = promisify(cp.execFile);
  * chain, git + worktree state, ssh key file mode, `osascript` (macOS notify)
  * and `direnv`. Token values are NEVER printed — only their source.
  */
-export async function runDoctor(
-  context: vscode.ExtensionContext
-): Promise<void> {
+export async function runDoctor(context: vscode.ExtensionContext): Promise<void> {
   const channel = vscode.window.createOutputChannel("Fordefi Hotfix Doctor");
   channel.show(true);
   const log = (line: string) => channel.appendLine(line);
@@ -52,9 +45,7 @@ export async function runDoctor(
   const failed = checks.filter((c) => !c.ok).length;
   if (failed === 0) {
     log(`Doctor: all ${checks.length} checks passed.`);
-    void vscode.window.showInformationMessage(
-      `Hotfix Doctor: all ${checks.length} checks passed.`
-    );
+    void vscode.window.showInformationMessage(`Hotfix Doctor: all ${checks.length} checks passed.`);
   } else {
     log(`Doctor: ${failed}/${checks.length} checks failed (see output above).`);
     void vscode.window.showWarningMessage(
@@ -99,10 +90,7 @@ async function checkGh(
   record(true, `gh runnable: ${ver.stdout.split("\n")[0]?.trim()}`);
   const status = await execText(ghBin, ["auth", "status"]);
   if (!status.ok) {
-    record(
-      false,
-      `gh auth status failed — run "gh auth login". Detail: ${status.error.trim()}`
-    );
+    record(false, `gh auth status failed — run "gh auth login". Detail: ${status.error.trim()}`);
     return;
   }
   record(true, "gh auth status OK");
@@ -116,14 +104,9 @@ async function checkToken(
   const ghBin = getGhPath().trim() || "gh";
   const ghTok = await execText(ghBin, ["auth", "token"]);
   const fromGh = ghTok.ok && ghTok.stdout.trim().length > 0;
-  const fromSecret = Boolean(
-    (await context.secrets.get(GITHUB_PAT_SECRET_KEY))?.trim()
-  );
+  const fromSecret = Boolean((await context.secrets.get(GITHUB_PAT_SECRET_KEY))?.trim());
   const fromCfg = Boolean(
-    vscode.workspace
-      .getConfiguration("fordefiHotfix")
-      .get<string>("githubPat", "")
-      ?.trim()
+    vscode.workspace.getConfiguration("fordefiHotfix").get<string>("githubPat", "")?.trim()
   );
   const fromEnv = Boolean(process.env.GITHUB_ACCESS_TOKEN?.trim());
 
@@ -133,9 +116,7 @@ async function checkToken(
   else if (fromCfg) source = "fordefiHotfix.githubPat setting";
   else if (fromEnv) source = "GITHUB_ACCESS_TOKEN env";
 
-  info(
-    `Token sources available: gh=${fromGh} secret=${fromSecret} cfg=${fromCfg} env=${fromEnv}`
-  );
+  info(`Token sources available: gh=${fromGh} secret=${fromSecret} cfg=${fromCfg} env=${fromEnv}`);
   if (source) {
     record(true, `GitHub token resolves via: ${source}`);
   } else {
@@ -159,10 +140,7 @@ async function checkGit(
 
   const repoRoot = getRepoRoot();
   if (!repoRoot) {
-    record(
-      false,
-      "repoRoot empty and no workspace folder open. Set fordefiHotfix.repoRoot."
-    );
+    record(false, "repoRoot empty and no workspace folder open. Set fordefiHotfix.repoRoot.");
     return;
   }
   info(`repoRoot: ${repoRoot}`);
@@ -172,22 +150,18 @@ async function checkGit(
     return;
   }
 
-  const inside = await execText(
-    "git",
-    ["-C", repoRoot, "rev-parse", "--is-inside-work-tree"],
-    { cwd: repoRoot }
-  );
+  const inside = await execText("git", ["-C", repoRoot, "rev-parse", "--is-inside-work-tree"], {
+    cwd: repoRoot,
+  });
   if (!inside.ok || inside.stdout.trim() !== "true") {
     record(false, `repoRoot is not a git repository: ${repoRoot}`);
     return;
   }
   record(true, "repoRoot is a git work tree");
 
-  const remote = await execText(
-    "git",
-    ["-C", repoRoot, "remote", "get-url", "origin"],
-    { cwd: repoRoot }
-  );
+  const remote = await execText("git", ["-C", repoRoot, "remote", "get-url", "origin"], {
+    cwd: repoRoot,
+  });
   if (remote.ok) {
     info(`origin: ${remote.stdout.trim()}`);
   } else {
@@ -199,11 +173,9 @@ async function checkGit(
   const wtPath = computeWorktreePath(repoRoot);
   if (fs.existsSync(wtPath)) {
     info(`Worktree present: ${wtPath}`);
-    const head = await execText(
-      "git",
-      ["-C", wtPath, "rev-parse", "--abbrev-ref", "HEAD"],
-      { cwd: wtPath }
-    );
+    const head = await execText("git", ["-C", wtPath, "rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: wtPath,
+    });
     if (head.ok) {
       const branch = head.stdout.trim();
       if (branch === HOTFIX_WORKTREE_BRANCH) {
@@ -219,36 +191,23 @@ async function checkGit(
     }
     const insteadOf = await execText(
       "git",
-      [
-        "-C",
-        wtPath,
-        "config",
-        "--worktree",
-        "--get-all",
-        "url.https://github.com/.insteadOf",
-      ],
+      ["-C", wtPath, "config", "--worktree", "--get-all", "url.https://github.com/.insteadOf"],
       { cwd: wtPath }
     );
     if (insteadOf.ok && insteadOf.stdout.includes("git@github.com:")) {
       record(true, "Worktree https-rewrite present (skips YubiKey on push/pull)");
     } else {
-      info(
-        "Worktree https-rewrite not yet applied — gets created on next watcher run."
-      );
+      info("Worktree https-rewrite not yet applied — gets created on next watcher run.");
     }
   } else {
     info(`Worktree not yet created: ${wtPath} (extension will create on first run)`);
   }
 
   const sshKey = (
-    vscode.workspace
-      .getConfiguration("fordefiHotfix")
-      .get<string>("worktreeSshKey", "") ?? ""
+    vscode.workspace.getConfiguration("fordefiHotfix").get<string>("worktreeSshKey", "") ?? ""
   ).trim();
   if (sshKey) {
-    const expanded = sshKey.startsWith("~")
-      ? path.join(os.homedir(), sshKey.slice(1))
-      : sshKey;
+    const expanded = sshKey.startsWith("~") ? path.join(os.homedir(), sshKey.slice(1)) : sshKey;
     info(`worktreeSshKey: ${expanded}`);
     if (!fs.existsSync(expanded)) {
       record(false, `worktreeSshKey file missing: ${expanded}`);
@@ -265,10 +224,7 @@ async function checkGit(
           record(true, `worktreeSshKey readable, perms ${mode.toString(8)}`);
         }
       } catch (e) {
-        record(
-          false,
-          `worktreeSshKey stat failed: ${e instanceof Error ? e.message : String(e)}`
-        );
+        record(false, `worktreeSshKey stat failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   } else {
@@ -281,9 +237,7 @@ async function checkGit(
   }
 }
 
-async function checkOsNotify(
-  record: (ok: boolean, line: string) => void
-): Promise<void> {
+async function checkOsNotify(record: (ok: boolean, line: string) => void): Promise<void> {
   if (process.platform !== "darwin") {
     return;
   }
@@ -320,9 +274,6 @@ async function checkDirenv(
   if (/Found RC allowed (true|0)/.test(status.stdout)) {
     record(true, "direnv .envrc allowed inside worktree");
   } else {
-    record(
-      false,
-      `direnv .envrc NOT allowed inside worktree. Run: cd ${wtPath} && direnv allow`
-    );
+    record(false, `direnv .envrc NOT allowed inside worktree. Run: cd ${wtPath} && direnv allow`);
   }
 }

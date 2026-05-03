@@ -108,9 +108,7 @@ export async function runInIntegratedTerminal(
     const consumeExecutionStream = async (
       execution: vscode.TerminalShellExecution
     ): Promise<void> => {
-      const maybeRead = (
-        execution as unknown as { read?: () => AsyncIterable<string> }
-      ).read;
+      const maybeRead = (execution as unknown as { read?: () => AsyncIterable<string> }).read;
       if (typeof maybeRead !== "function") {
         return;
       }
@@ -124,9 +122,7 @@ export async function runInIntegratedTerminal(
       }
     };
 
-    const tryExecute = (
-      si: vscode.TerminalShellIntegration | undefined
-    ): boolean => {
+    const tryExecute = (si: vscode.TerminalShellIntegration | undefined): boolean => {
       if (activeExecution || !si) {
         return false;
       }
@@ -154,9 +150,7 @@ export async function runInIntegratedTerminal(
         return;
       }
       log(
-        `[shell integration] exit ${
-          e.exitCode === undefined ? "undefined" : String(e.exitCode)
-        }`
+        `[shell integration] exit ${e.exitCode === undefined ? "undefined" : String(e.exitCode)}`
       );
       resolvedExit = e.exitCode;
       done();
@@ -200,9 +194,7 @@ export async function runInIntegratedTerminal(
       if (i >= 0) {
         disposables.splice(i, 1);
       }
-      fallbackSendText(
-        `no shell integration within ${shellIntegrationWaitMs}ms`
-      );
+      fallbackSendText(`no shell integration within ${shellIntegrationWaitMs}ms`);
     }, shellIntegrationWaitMs);
   });
 
@@ -237,18 +229,8 @@ export type SpawnRunResult = {
 };
 
 /** Never rejects — spawn errors surface as `{ spawnError }`. */
-export async function runViaSpawn(
-  options: SpawnRunOptions
-): Promise<SpawnRunResult> {
-  const {
-    command,
-    cwd,
-    shell = true,
-    log,
-    captureOutput = false,
-    onChunk,
-    onChild,
-  } = options;
+export async function runViaSpawn(options: SpawnRunOptions): Promise<SpawnRunResult> {
+  const { command, cwd, shell = true, log, captureOutput = false, onChunk, onChild } = options;
 
   return new Promise<SpawnRunResult>((resolve) => {
     let captured = "";

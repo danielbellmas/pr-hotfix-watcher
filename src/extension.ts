@@ -28,14 +28,10 @@ const LIST_AFFECTING_KEYS = [
   "fordefiHotfix.githubPat",
 ];
 
-const TOKEN_AFFECTING_KEYS = [
-  "fordefiHotfix.ghPath",
-  "fordefiHotfix.githubPat",
-];
+const TOKEN_AFFECTING_KEYS = ["fordefiHotfix.ghPath", "fordefiHotfix.githubPat"];
 
 const DEBUG_TERMINAL_KEY = "fordefiHotfix.debugTerminal";
-const RUN_MODE_MIGRATION_DONE_KEY =
-  "fordefiHotfix.hotfixRunModeMigrationDoneV1";
+const RUN_MODE_MIGRATION_DONE_KEY = "fordefiHotfix.hotfixRunModeMigrationDoneV1";
 
 export function activate(context: vscode.ExtensionContext): void {
   registerHotfixCliOutputChannel(context);
@@ -51,15 +47,9 @@ export function activate(context: vscode.ExtensionContext): void {
   void migrateLegacyRunMode(context);
 
   const provider = new PrListController(context);
-  const webviewProvider = new HotfixPrWebviewProvider(
-    provider,
-    context.extensionUri
-  );
+  const webviewProvider = new HotfixPrWebviewProvider(provider, context.extensionUri);
 
-  const debugStatusBar = vscode.window.createStatusBarItem(
-    vscode.StatusBarAlignment.Right,
-    100
-  );
+  const debugStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   debugStatusBar.command = "fordefiHotfix.toggleDebugTerminal";
   debugStatusBar.tooltip =
     "Toggle Hotfix debug terminal mode (transparent ↔ visible terminal). When 'debug' is on, the hotfix command runs in a real integrated terminal so you can watch / intervene.";
@@ -73,16 +63,10 @@ export function activate(context: vscode.ExtensionContext): void {
   refreshDebugStatusBar();
 
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveColorTheme(() =>
-      webviewProvider.notifyThemeChanged()
-    ),
-    vscode.window.registerWebviewViewProvider(
-      HotfixPrWebviewProvider.viewType,
-      webviewProvider,
-      {
-        webviewOptions: { retainContextWhenHidden: true },
-      }
-    ),
+    vscode.window.onDidChangeActiveColorTheme(() => webviewProvider.notifyThemeChanged()),
+    vscode.window.registerWebviewViewProvider(HotfixPrWebviewProvider.viewType, webviewProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
     { dispose: () => webviewProvider.dispose() },
     { dispose: () => provider.stopWatch() },
     vscode.commands.registerCommand("fordefiHotfix.setToken", async () => {
@@ -100,99 +84,67 @@ export function activate(context: vscode.ExtensionContext): void {
       void vscode.window.showInformationMessage("GitHub token saved.");
       await provider.refresh();
     }),
-    vscode.commands.registerCommand(
-      "fordefiHotfix.clearStoredToken",
-      async () => {
-        await clearStoredGithubToken(context);
-        void vscode.window.showInformationMessage(
-          "Stored GitHub token removed. The extension will use `gh auth token` when available."
+    vscode.commands.registerCommand("fordefiHotfix.clearStoredToken", async () => {
+      await clearStoredGithubToken(context);
+      void vscode.window.showInformationMessage(
+        "Stored GitHub token removed. The extension will use `gh auth token` when available."
+      );
+      await provider.refresh();
+    }),
+    vscode.commands.registerCommand("fordefiHotfix.refresh", () => provider.refresh()),
+    vscode.commands.registerCommand("fordefiHotfix.startWatch", () => provider.startWatch()),
+    vscode.commands.registerCommand("fordefiHotfix.stopWatch", () => provider.stopWatch()),
+    vscode.commands.registerCommand("fordefiHotfix.doctor", () => runDoctor(context)),
+    vscode.commands.registerCommand("fordefiHotfix.toggleDebugTerminal", async () => {
+      const next = !isDebugTerminalEnabled();
+      await setDebugTerminalEnabled(next);
+      refreshDebugStatusBar();
+      void vscode.window.showInformationMessage(
+        next
+          ? "Hotfix debug terminal mode: ON. Next run will use a visible integrated terminal."
+          : "Hotfix transparent mode: ON. Next run will be silent — you'll only see notifications for actions and milestones."
+      );
+    }),
+    vscode.commands.registerCommand("fordefiHotfix.openWorktreeTerminal", (cwdArg?: string) => {
+      const cwd = typeof cwdArg === "string" && cwdArg.trim() ? cwdArg : getRepoRoot();
+      if (!cwd) {
+        void vscode.window.showErrorMessage(
+          "No worktree path known yet. Start a hotfix run first."
         );
-        await provider.refresh();
+        return;
       }
-    ),
-    vscode.commands.registerCommand("fordefiHotfix.refresh", () =>
-      provider.refresh()
-    ),
-    vscode.commands.registerCommand("fordefiHotfix.startWatch", () =>
-      provider.startWatch()
-    ),
-    vscode.commands.registerCommand("fordefiHotfix.stopWatch", () =>
-      provider.stopWatch()
-    ),
-    vscode.commands.registerCommand("fordefiHotfix.doctor", () =>
-      runDoctor(context)
-    ),
-    vscode.commands.registerCommand(
-      "fordefiHotfix.toggleDebugTerminal",
-      async () => {
-        const next = !isDebugTerminalEnabled();
-        await setDebugTerminalEnabled(next);
-        refreshDebugStatusBar();
-        void vscode.window.showInformationMessage(
-          next
-            ? "Hotfix debug terminal mode: ON. Next run will use a visible integrated terminal."
-            : "Hotfix transparent mode: ON. Next run will be silent — you'll only see notifications for actions and milestones."
+      const term = vscode.window.createTerminal({
+        name: "Hotfix worktree",
+        cwd,
+      });
+      term.show(true);
+    }),
+    vscode.commands.registerCommand("fordefiHotfix.syncRepoFromGit", async () => {
+      const root = getRepoRoot();
+      if (!root) {
+        void vscode.window.showErrorMessage(
+          "Open a workspace folder, or set Hotfix › Repo root in settings."
         );
+        return;
       }
-    ),
-    vscode.commands.registerCommand(
-      "fordefiHotfix.openWorktreeTerminal",
-      (cwdArg?: string) => {
-        const cwd = typeof cwdArg === "string" && cwdArg.trim() ? cwdArg : getRepoRoot();
-        if (!cwd) {
-          void vscode.window.showErrorMessage(
-            "No worktree path known yet. Start a hotfix run first."
-          );
-          return;
-        }
-        const term = vscode.window.createTerminal({
-          name: "Hotfix worktree",
-          cwd,
-        });
-        term.show(true);
+      const remote = readOriginRemote(root);
+      if (!remote) {
+        void vscode.window.showErrorMessage(`Could not read git remote 'origin' under ${root}.`);
+        return;
       }
-    ),
-    vscode.commands.registerCommand(
-      "fordefiHotfix.syncRepoFromGit",
-      async () => {
-        const root = getRepoRoot();
-        if (!root) {
-          void vscode.window.showErrorMessage(
-            "Open a workspace folder, or set Hotfix › Repo root in settings."
-          );
-          return;
-        }
-        const remote = readOriginRemote(root);
-        if (!remote) {
-          void vscode.window.showErrorMessage(
-            `Could not read git remote 'origin' under ${root}.`
-          );
-          return;
-        }
-        const parsed = parseGitHubRepoFromRemote(remote);
-        if (!parsed) {
-          void vscode.window.showErrorMessage(
-            `Unrecognized GitHub remote URL: ${remote}`
-          );
-          return;
-        }
-        const cfg = vscode.workspace.getConfiguration("fordefiHotfix");
-        await cfg.update(
-          "owner",
-          parsed.owner,
-          vscode.ConfigurationTarget.Workspace
-        );
-        await cfg.update(
-          "repo",
-          parsed.repo,
-          vscode.ConfigurationTarget.Workspace
-        );
-        void vscode.window.showInformationMessage(
-          `Hotfix repo set to ${parsed.owner}/${parsed.repo}.`
-        );
-        await provider.refresh();
+      const parsed = parseGitHubRepoFromRemote(remote);
+      if (!parsed) {
+        void vscode.window.showErrorMessage(`Unrecognized GitHub remote URL: ${remote}`);
+        return;
       }
-    )
+      const cfg = vscode.workspace.getConfiguration("fordefiHotfix");
+      await cfg.update("owner", parsed.owner, vscode.ConfigurationTarget.Workspace);
+      await cfg.update("repo", parsed.repo, vscode.ConfigurationTarget.Workspace);
+      void vscode.window.showInformationMessage(
+        `Hotfix repo set to ${parsed.owner}/${parsed.repo}.`
+      );
+      await provider.refresh();
+    })
   );
 
   context.subscriptions.push(
@@ -219,25 +171,17 @@ export function activate(context: vscode.ExtensionContext): void {
  *
  * Gated by a globalState flag so the migration runs at most once per machine.
  */
-async function migrateLegacyRunMode(
-  context: vscode.ExtensionContext
-): Promise<void> {
+async function migrateLegacyRunMode(context: vscode.ExtensionContext): Promise<void> {
   if (context.globalState.get<boolean>(RUN_MODE_MIGRATION_DONE_KEY) === true) {
     return;
   }
   const cfg = vscode.workspace.getConfiguration("fordefiHotfix");
   const inspected = cfg.inspect<string>("hotfixRunMode");
   const explicit =
-    inspected?.workspaceValue ??
-    inspected?.workspaceFolderValue ??
-    inspected?.globalValue;
+    inspected?.workspaceValue ?? inspected?.workspaceFolderValue ?? inspected?.globalValue;
   if (explicit === "integratedTerminal") {
     try {
-      await cfg.update(
-        "debugTerminal",
-        true,
-        vscode.ConfigurationTarget.Global
-      );
+      await cfg.update("debugTerminal", true, vscode.ConfigurationTarget.Global);
     } catch {
       // Best-effort; users can flip the toggle by hand if this fails.
     }

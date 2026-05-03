@@ -42,11 +42,7 @@ describe("MergeHandoffGate", () => {
   it("claimMerge returns true exactly once even under concurrent polls", async () => {
     const gate = new MergeHandoffGate();
     let mergeDispatches = 0;
-    const body = async ({
-      claimMerge,
-    }: {
-      claimMerge: () => boolean;
-    }): Promise<void> => {
+    const body = async ({ claimMerge }: { claimMerge: () => boolean }): Promise<void> => {
       // Simulate the watch-poll body doing network I/O before the merge branch.
       await tick();
       await tick();
@@ -57,11 +53,7 @@ describe("MergeHandoffGate", () => {
       await tick();
       mergeDispatches++;
     };
-    await Promise.all([
-      gate.runPoll(body),
-      gate.runPoll(body),
-      gate.runPoll(body),
-    ]);
+    await Promise.all([gate.runPoll(body), gate.runPoll(body), gate.runPoll(body)]);
     expect(mergeDispatches).toBe(1);
     expect(gate.hasHandledMerge).toBe(true);
   });

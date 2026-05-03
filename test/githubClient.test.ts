@@ -45,49 +45,33 @@ describe("isOpenOrMergedSearchItem", () => {
     ).toBe(true);
   });
   it("rejects closed without merge", () => {
+    expect(isOpenOrMergedSearchItem(searchItem({ state: "closed", pull_request: {} }))).toBe(false);
     expect(
-      isOpenOrMergedSearchItem(
-        searchItem({ state: "closed", pull_request: {} })
-      )
-    ).toBe(false);
-    expect(
-      isOpenOrMergedSearchItem(
-        searchItem({ state: "closed", pull_request: { merged_at: null } })
-      )
+      isOpenOrMergedSearchItem(searchItem({ state: "closed", pull_request: { merged_at: null } }))
     ).toBe(false);
   });
 });
 
 describe("isOpenOrMergedPull", () => {
   it("accepts open", () => {
-    expect(isOpenOrMergedPull(pull({ state: "open", merged_at: null }))).toBe(
+    expect(isOpenOrMergedPull(pull({ state: "open", merged_at: null }))).toBe(true);
+  });
+  it("accepts merged", () => {
+    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" }))).toBe(
       true
     );
   });
-  it("accepts merged", () => {
-    expect(
-      isOpenOrMergedPull(
-        pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" })
-      )
-    ).toBe(true);
-  });
   it("rejects closed without merge", () => {
-    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: null }))).toBe(
-      false
-    );
+    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: null }))).toBe(false);
   });
 
   it("treats merged_at as authoritative over state for inclusion", () => {
-    expect(
-      isOpenOrMergedPull(
-        pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" })
-      )
-    ).toBe(true);
-    expect(
-      isOpenOrMergedPull(
-        pull({ state: "open", merged_at: "2024-01-01T00:00:00Z" })
-      )
-    ).toBe(true);
+    expect(isOpenOrMergedPull(pull({ state: "closed", merged_at: "2024-01-01T00:00:00Z" }))).toBe(
+      true
+    );
+    expect(isOpenOrMergedPull(pull({ state: "open", merged_at: "2024-01-01T00:00:00Z" }))).toBe(
+      true
+    );
   });
 });
 
@@ -117,8 +101,7 @@ function pullListItem(p: Partial<RepoPullListItem>): RepoPullListItem {
     title: p.title ?? "title",
     state: p.state ?? "open",
     created_at: p.created_at ?? "2026-04-27T12:00:00Z",
-    html_url:
-      p.html_url ?? `https://github.com/o/r/pull/${p.number ?? 1}`,
+    html_url: p.html_url ?? `https://github.com/o/r/pull/${p.number ?? 1}`,
     merged_at: p.merged_at ?? null,
     user: p.user === undefined ? { login: "alice" } : p.user,
   };
@@ -130,10 +113,7 @@ function stubFetchOnce(
 ): { calls: { url: string; init?: RequestInit }[]; restore: () => void } {
   const calls: { url: string; init?: RequestInit }[] = [];
   const original = globalThis.fetch;
-  globalThis.fetch = (async (
-    input: string | URL,
-    init?: RequestInit
-  ) => {
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     calls.push({ url: String(input), init });
     return new Response(JSON.stringify(body), {
       status,
@@ -167,13 +147,7 @@ describe("searchAuthorPullRequests", () => {
       pullListItem({ number: 97, user: { login: "alice" } }),
     ]);
     try {
-      const got = await searchAuthorPullRequests(
-        "t",
-        "o",
-        "r",
-        "alice",
-        10
-      );
+      const got = await searchAuthorPullRequests("t", "o", "r", "alice", 10);
       expect(got.map((x) => x.number)).toEqual([99, 97]);
     } finally {
       stub.restore();
@@ -243,17 +217,9 @@ describe("searchAuthorPullRequests", () => {
   });
 
   it("returns [] when no PR matches the author (the bug we are fixing did the same — verify no crash)", async () => {
-    const stub = stubFetchOnce([
-      pullListItem({ number: 1, user: { login: "bob" } }),
-    ]);
+    const stub = stubFetchOnce([pullListItem({ number: 1, user: { login: "bob" } })]);
     try {
-      const got = await searchAuthorPullRequests(
-        "t",
-        "o",
-        "r",
-        "danielbellmas",
-        20
-      );
+      const got = await searchAuthorPullRequests("t", "o", "r", "danielbellmas", 20);
       expect(got).toEqual([]);
     } finally {
       stub.restore();
@@ -276,9 +242,9 @@ describe("searchAuthorPullRequests", () => {
   it("surfaces a GitHubError on non-2xx (token / permission failures stay loud)", async () => {
     const stub = stubFetchOnce({ message: "Bad credentials" }, 401);
     try {
-      await expect(
-        searchAuthorPullRequests("t", "o", "r", "alice", 10)
-      ).rejects.toBeInstanceOf(GitHubError);
+      await expect(searchAuthorPullRequests("t", "o", "r", "alice", 10)).rejects.toBeInstanceOf(
+        GitHubError
+      );
     } finally {
       stub.restore();
     }

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildDisplayPrRows,
-  filterPrRowsByQuery,
-  mergeSelectedPrRows,
-} from "../src/prSearch";
+import { buildDisplayPrRows, filterPrRowsByQuery, mergeSelectedPrRows } from "../src/prSearch";
 
 const rows = [
   { number: 10, title: "Fix hotfix pipeline" },
@@ -18,12 +14,8 @@ describe("filterPrRowsByQuery", () => {
   });
 
   it("matches title substring case-insensitively", () => {
-    expect(filterPrRowsByQuery(rows, "hotfix").map((r) => r.number)).toEqual([
-      10, 99,
-    ]);
-    expect(filterPrRowsByQuery(rows, "urgent").map((r) => r.number)).toEqual([
-      99,
-    ]);
+    expect(filterPrRowsByQuery(rows, "hotfix").map((r) => r.number)).toEqual([10, 99]);
+    expect(filterPrRowsByQuery(rows, "urgent").map((r) => r.number)).toEqual([99]);
   });
 
   it("matches exact PR number", () => {
@@ -36,9 +28,7 @@ describe("filterPrRowsByQuery", () => {
       { number: 1, title: "Alpha" },
       { number: 10, title: "Beta" },
     ];
-    expect(filterPrRowsByQuery(withOne, "#1").map((r) => r.number)).toEqual([
-      1,
-    ]);
+    expect(filterPrRowsByQuery(withOne, "#1").map((r) => r.number)).toEqual([1]);
   });
 
   it("returns empty when nothing matches", () => {

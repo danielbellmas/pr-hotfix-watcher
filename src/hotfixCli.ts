@@ -32,16 +32,15 @@ export function normalizeHotfixCliOptions(
       partial?.env === "prod"
         ? "prod"
         : partial?.env === "both"
-        ? "both"
-        : partial?.env === "pre"
-        ? "pre"
-        : defaults.env,
+          ? "both"
+          : partial?.env === "pre"
+            ? "pre"
+            : defaults.env,
     draft: typeof partial?.draft === "boolean" ? partial.draft : defaults.draft,
     criticalFastTrack:
       typeof partial?.criticalFastTrack === "boolean"
         ? partial.criticalFastTrack
         : defaults.criticalFastTrack,
-    deploy:
-      typeof partial?.deploy === "boolean" ? partial.deploy : defaults.deploy,
+    deploy: typeof partial?.deploy === "boolean" ? partial.deploy : defaults.deploy,
   };
 }

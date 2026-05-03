@@ -51,24 +51,17 @@ describe("parseHotfixPrUrl", () => {
       "HOTFIX_PR_URL=https://github.com/arnac-io/arnac/pull/12345",
       "fcli: done.",
     ].join("\n");
-    expect(parseHotfixPrUrl(out)).toBe(
-      "https://github.com/arnac-io/arnac/pull/12345"
-    );
+    expect(parseHotfixPrUrl(out)).toBe("https://github.com/arnac-io/arnac/pull/12345");
   });
 
   it("tolerates surrounding whitespace and CRLF", () => {
-    const out =
-      "prefix\r\n   HOTFIX_PR_URL = https://github.com/arnac-io/arnac/pull/7 \r\nsuffix";
-    expect(parseHotfixPrUrl(out)).toBe(
-      "https://github.com/arnac-io/arnac/pull/7"
-    );
+    const out = "prefix\r\n   HOTFIX_PR_URL = https://github.com/arnac-io/arnac/pull/7 \r\nsuffix";
+    expect(parseHotfixPrUrl(out)).toBe("https://github.com/arnac-io/arnac/pull/7");
   });
 
   it("strips ANSI color codes before matching", () => {
     const out = `\u001b[32mHOTFIX_PR_URL=\u001b[0m\u001b[1mhttps://github.com/arnac-io/arnac/pull/42\u001b[0m`;
-    expect(parseHotfixPrUrl(out)).toBe(
-      "https://github.com/arnac-io/arnac/pull/42"
-    );
+    expect(parseHotfixPrUrl(out)).toBe("https://github.com/arnac-io/arnac/pull/42");
   });
 
   it("returns the last match when multiple are present", () => {
@@ -76,9 +69,7 @@ describe("parseHotfixPrUrl", () => {
       "HOTFIX_PR_URL=https://github.com/arnac-io/arnac/pull/1",
       "HOTFIX_PR_URL=https://github.com/arnac-io/arnac/pull/2",
     ].join("\n");
-    expect(parseHotfixPrUrl(out)).toBe(
-      "https://github.com/arnac-io/arnac/pull/2"
-    );
+    expect(parseHotfixPrUrl(out)).toBe("https://github.com/arnac-io/arnac/pull/2");
   });
 });
 
@@ -164,32 +155,22 @@ describe("parseHotfixCliJson", () => {
 
   it("rejects entries with missing pr_number or html_url", () => {
     expect(
-      parseHotfixCliJson(
-        JSON.stringify({ prs: [{ ...baseEntry, pr_number: null }] })
-      )
+      parseHotfixCliJson(JSON.stringify({ prs: [{ ...baseEntry, pr_number: null }] }))
     ).toBeUndefined();
     expect(
-      parseHotfixCliJson(
-        JSON.stringify({ prs: [{ ...baseEntry, html_url: "" }] })
-      )
+      parseHotfixCliJson(JSON.stringify({ prs: [{ ...baseEntry, html_url: "" }] }))
     ).toBeUndefined();
   });
 
   it("returns undefined when prs is missing or not an array", () => {
-    expect(
-      parseHotfixCliJson(JSON.stringify({ prs: "nope" }))
-    ).toBeUndefined();
-    expect(
-      parseHotfixCliJson(JSON.stringify({ source_pr_numbers: [1] }))
-    ).toBeUndefined();
+    expect(parseHotfixCliJson(JSON.stringify({ prs: "nope" }))).toBeUndefined();
+    expect(parseHotfixCliJson(JSON.stringify({ source_pr_numbers: [1] }))).toBeUndefined();
   });
 });
 
 describe("parseGithubPullUrl", () => {
   it("parses owner/repo/number from a standard GitHub PR URL", () => {
-    expect(
-      parseGithubPullUrl("https://github.com/arnac-io/arnac/pull/123")
-    ).toEqual({
+    expect(parseGithubPullUrl("https://github.com/arnac-io/arnac/pull/123")).toEqual({
       owner: "arnac-io",
       repo: "arnac",
       prNumber: 123,
@@ -197,24 +178,18 @@ describe("parseGithubPullUrl", () => {
   });
 
   it("ignores trailing slashes and fragments", () => {
-    expect(
-      parseGithubPullUrl(
-        "https://github.com/arnac-io/arnac/pull/123/files#diff-xyz"
-      )
-    ).toEqual({
-      owner: "arnac-io",
-      repo: "arnac",
-      prNumber: 123,
-    });
+    expect(parseGithubPullUrl("https://github.com/arnac-io/arnac/pull/123/files#diff-xyz")).toEqual(
+      {
+        owner: "arnac-io",
+        repo: "arnac",
+        prNumber: 123,
+      }
+    );
   });
 
   it("returns undefined for malformed URLs", () => {
     expect(parseGithubPullUrl("not a url")).toBeUndefined();
-    expect(
-      parseGithubPullUrl("https://github.com/arnac-io/arnac/issues/1")
-    ).toBeUndefined();
-    expect(
-      parseGithubPullUrl("https://github.com/arnac-io/arnac/pull/abc")
-    ).toBeUndefined();
+    expect(parseGithubPullUrl("https://github.com/arnac-io/arnac/issues/1")).toBeUndefined();
+    expect(parseGithubPullUrl("https://github.com/arnac-io/arnac/pull/abc")).toBeUndefined();
   });
 });

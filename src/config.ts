@@ -33,13 +33,9 @@ function getTokenResolver(context: vscode.ExtensionContext): TokenResolver {
       },
       config: {
         ghPath: () =>
-          vscode.workspace
-            .getConfiguration("fordefiHotfix")
-            .get<string>("ghPath", "") ?? "",
+          vscode.workspace.getConfiguration("fordefiHotfix").get<string>("ghPath", "") ?? "",
         githubPat: () =>
-          vscode.workspace
-            .getConfiguration("fordefiHotfix")
-            .get<string>("githubPat", "") ?? "",
+          vscode.workspace.getConfiguration("fordefiHotfix").get<string>("githubPat", "") ?? "",
       },
       envToken: () => process.env.GITHUB_ACCESS_TOKEN,
       now: () => Date.now(),
@@ -52,22 +48,15 @@ export function invalidateGhTokenCache(): void {
   _resolver?.invalidate();
 }
 
-export function resolveGitHubToken(
-  context: vscode.ExtensionContext
-): Promise<string | undefined> {
+export function resolveGitHubToken(context: vscode.ExtensionContext): Promise<string | undefined> {
   return getTokenResolver(context).resolve();
 }
 
-export function storeGitHubToken(
-  context: vscode.ExtensionContext,
-  token: string
-): Promise<void> {
+export function storeGitHubToken(context: vscode.ExtensionContext, token: string): Promise<void> {
   return getTokenResolver(context).store(token);
 }
 
-export function clearStoredGithubToken(
-  context: vscode.ExtensionContext
-): Promise<void> {
+export function clearStoredGithubToken(context: vscode.ExtensionContext): Promise<void> {
   return getTokenResolver(context).clear();
 }
 
@@ -80,15 +69,11 @@ export function getRepoConfig(): { owner: string; repo: string } {
 }
 
 export function getRecentPrCount(): number {
-  return vscode.workspace
-    .getConfiguration("fordefiHotfix")
-    .get<number>("recentPrCount", 30);
+  return vscode.workspace.getConfiguration("fordefiHotfix").get<number>("recentPrCount", 30);
 }
 
 export function getDisplayPrLimit(): number {
-  const n = vscode.workspace
-    .getConfiguration("fordefiHotfix")
-    .get<number>("displayPrLimit", 10);
+  const n = vscode.workspace.getConfiguration("fordefiHotfix").get<number>("displayPrLimit", 10);
   return Math.max(1, Math.min(100, Math.round(n)));
 }
 
@@ -100,12 +85,7 @@ export function getPollIntervalMs(): number {
 }
 
 export function getGhPath(): string {
-  return (
-    vscode.workspace
-      .getConfiguration("fordefiHotfix")
-      .get<string>("ghPath", "")
-      ?.trim() ?? ""
-  );
+  return vscode.workspace.getConfiguration("fordefiHotfix").get<string>("ghPath", "")?.trim() ?? "";
 }
 
 /**
@@ -152,9 +132,7 @@ export function getHotfixCliOptionsFromConfig(): HotfixCliOptions {
   return {
     env,
     draft: Boolean(c.get<boolean>("hotfixDraft", false)),
-    criticalFastTrack: Boolean(
-      c.get<boolean>("hotfixCriticalFastTrack", false)
-    ),
+    criticalFastTrack: Boolean(c.get<boolean>("hotfixCriticalFastTrack", false)),
     deploy: Boolean(c.get<boolean>("hotfixDeploy", false)),
   };
 }
@@ -172,9 +150,7 @@ export function getWorkflowsRepoConfig(): WorkflowsRepoConfig {
   return {
     owner: c.get<string>("workflowsOwner", "arnac-io").trim() || "arnac-io",
     repo: c.get<string>("workflowsRepo", "workflows").trim() || "workflows",
-    preWorkflow:
-      c.get<string>("preHotfixWorkflow", "pre-hotfix.yml").trim() ||
-      "pre-hotfix.yml",
+    preWorkflow: c.get<string>("preHotfixWorkflow", "pre-hotfix.yml").trim() || "pre-hotfix.yml",
     prodWorkflow:
       c.get<string>("productionHotfixWorkflow", "production-hotfix.yml").trim() ||
       "production-hotfix.yml",
@@ -254,9 +230,7 @@ export function getHotfixRunMode(): HotfixRunMode {
 
 export function isDebugTerminalEnabled(): boolean {
   return Boolean(
-    vscode.workspace
-      .getConfiguration("fordefiHotfix")
-      .get<boolean>("debugTerminal", false)
+    vscode.workspace.getConfiguration("fordefiHotfix").get<boolean>("debugTerminal", false)
   );
 }
 

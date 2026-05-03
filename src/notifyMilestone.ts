@@ -50,9 +50,7 @@ export type MilestoneNotificationApi = {
 };
 
 const DEFAULT_API: MilestoneNotificationApi = {
-  showInformationMessage: vscode.window.showInformationMessage.bind(
-    vscode.window
-  ),
+  showInformationMessage: vscode.window.showInformationMessage.bind(vscode.window),
   showWarningMessage: vscode.window.showWarningMessage.bind(vscode.window),
   showErrorMessage: vscode.window.showErrorMessage.bind(vscode.window),
   showOsNotification,

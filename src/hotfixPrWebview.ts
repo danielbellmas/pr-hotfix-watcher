@@ -22,10 +22,7 @@ export type GithubPrColorScheme = "light" | "dark";
 
 export function activeGithubColorScheme(): GithubPrColorScheme {
   const k = vscode.window.activeColorTheme.kind;
-  if (
-    k === vscode.ColorThemeKind.Light ||
-    k === vscode.ColorThemeKind.HighContrastLight
-  ) {
+  if (k === vscode.ColorThemeKind.Light || k === vscode.ColorThemeKind.HighContrastLight) {
     return "light";
   }
   return "dark";
@@ -42,9 +39,7 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
     private readonly prs: PrListController,
     private readonly extensionUri: vscode.Uri
   ) {
-    this.treeListenerSub = this.prs.onDidChangeTreeData(() =>
-      this.pushState()
-    );
+    this.treeListenerSub = this.prs.onDidChangeTreeData(() => this.pushState());
   }
 
   dispose(): void {
@@ -59,10 +54,7 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [mediaRoot],
     };
-    webviewView.webview.html = this.renderHtml(
-      webviewView.webview,
-      activeGithubColorScheme()
-    );
+    webviewView.webview.html = this.renderHtml(webviewView.webview, activeGithubColorScheme());
     const subscriptions: vscode.Disposable[] = [];
     subscriptions.push(
       webviewView.webview.onDidReceiveMessage((msg: FromWebview) => {
@@ -180,10 +172,7 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private renderHtml(
-    webview: vscode.Webview,
-    initialGithubScheme: GithubPrColorScheme
-  ): string {
+  private renderHtml(webview: vscode.Webview, initialGithubScheme: GithubPrColorScheme): string {
     const nonce = generateNonce();
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "media", "webview.css")
@@ -210,11 +199,7 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
     if (this.htmlTemplateCache !== undefined) {
       return this.htmlTemplateCache;
     }
-    const path = vscode.Uri.joinPath(
-      this.extensionUri,
-      "media",
-      "webview.html"
-    ).fsPath;
+    const path = vscode.Uri.joinPath(this.extensionUri, "media", "webview.html").fsPath;
     this.htmlTemplateCache = fs.readFileSync(path, "utf8");
     return this.htmlTemplateCache;
   }

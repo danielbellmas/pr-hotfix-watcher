@@ -13,10 +13,7 @@
  *   `fordefiHotfix.hotfixRunMode: "background"` in older versions; treated
  *   identically to `transparent` everywhere we branch on the mode.
  */
-export type HotfixRunMode =
-  | "integratedTerminal"
-  | "background"
-  | "transparent";
+export type HotfixRunMode = "integratedTerminal" | "background" | "transparent";
 
 export function parseHotfixRunMode(raw: string | undefined): HotfixRunMode {
   if (raw === "integratedTerminal") return "integratedTerminal";
@@ -43,8 +40,7 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 }
 
-const HOTFIX_PR_URL_RE =
-  /HOTFIX_PR_URL\s*=\s*(https?:\/\/github\.com\/[^\s"'<>]+?\/pull\/\d+)/i;
+const HOTFIX_PR_URL_RE = /HOTFIX_PR_URL\s*=\s*(https?:\/\/github\.com\/[^\s"'<>]+?\/pull\/\d+)/i;
 
 /**
  * Parse the `HOTFIX_PR_URL=<url>` line emitted by the arnac fcli hotfix script.
@@ -72,9 +68,7 @@ export type ParsedPrUrl = {
 
 /** Split a GitHub pull-request URL (e.g. https://github.com/arnac-io/arnac/pull/123) into owner/repo/prNumber. */
 export function parseGithubPullUrl(url: string): ParsedPrUrl | undefined {
-  const m = /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/i.exec(
-    url.trim()
-  );
+  const m = /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/i.exec(url.trim());
   if (!m) {
     return undefined;
   }
@@ -111,8 +105,7 @@ function coerceHotfixPrEntry(raw: unknown): HotfixPrEntry | undefined {
     return undefined;
   }
   const envRaw = raw["environment"];
-  const envStr =
-    typeof envRaw === "string" ? envRaw.trim().toLowerCase() : undefined;
+  const envStr = typeof envRaw === "string" ? envRaw.trim().toLowerCase() : undefined;
   if (envStr !== "pre" && envStr !== "prod") {
     return undefined;
   }
@@ -136,8 +129,7 @@ function coerceHotfixPrEntry(raw: unknown): HotfixPrEntry | undefined {
     env: envStr,
     prNumber,
     htmlUrl,
-    releaseBranch:
-      typeof releaseBranch === "string" ? releaseBranch : undefined,
+    releaseBranch: typeof releaseBranch === "string" ? releaseBranch : undefined,
     hotfixBranch: typeof hotfixBranch === "string" ? hotfixBranch : undefined,
     draft: typeof draft === "boolean" ? draft : undefined,
   };
@@ -153,9 +145,7 @@ function coerceHotfixPrEntry(raw: unknown): HotfixPrEntry | undefined {
  * Returns `undefined` when no parseable payload found (caller falls back to the
  * legacy `HOTFIX_PR_URL=...` regex).
  */
-export function parseHotfixCliJson(
-  output: string
-): HotfixPrEntry[] | undefined {
+export function parseHotfixCliJson(output: string): HotfixPrEntry[] | undefined {
   if (!output) {
     return undefined;
   }

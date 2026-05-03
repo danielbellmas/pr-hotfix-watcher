@@ -1,20 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { TokenResolver, type TokenResolverDeps } from "../src/tokenResolver";
 
-function makeDeps(
-  overrides: Partial<TokenResolverDeps> = {}
-): TokenResolverDeps & {
-  exec: ReturnType<typeof vi.fn>;
+type AnyMock = Mock<(...args: unknown[]) => string | Promise<string | undefined> | undefined>;
+
+function makeDeps(overrides: Partial<TokenResolverDeps> = {}): TokenResolverDeps & {
+  exec: AnyMock;
   secrets: {
-    get: ReturnType<typeof vi.fn>;
-    store: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
+    get: AnyMock;
+    store: AnyMock;
+    delete: AnyMock;
   };
 } {
   let t = 1_000_000;
-  const exec = vi.fn(
-    (_file: string, _args: string[], _timeout: number) => undefined
-  );
+  const exec = vi.fn((_file: string, _args: string[], _timeout: number) => undefined);
   const secrets = {
     get: vi.fn(async (_k: string) => undefined),
     store: vi.fn(async (_k: string, _v: string) => undefined),
@@ -83,7 +81,9 @@ describe("TokenResolver.resolve — priority chain", () => {
   });
 
   it("uses configured ghPath as the executable when non-empty", async () => {
-    const exec = vi.fn((_file: string, _args: string[], _timeout: number) => "tok" as string | undefined);
+    const exec = vi.fn(
+      (_file: string, _args: string[], _timeout: number) => "tok" as string | undefined
+    );
     const deps = makeDeps({
       exec,
       config: { ghPath: () => " /opt/homebrew/bin/gh ", githubPat: () => "" },
@@ -94,7 +94,9 @@ describe("TokenResolver.resolve — priority chain", () => {
   });
 
   it("defaults to 'gh' on empty ghPath", async () => {
-    const exec = vi.fn((_file: string, _args: string[], _timeout: number) => "tok" as string | undefined);
+    const exec = vi.fn(
+      (_file: string, _args: string[], _timeout: number) => "tok" as string | undefined
+    );
     const deps = makeDeps({ exec });
     const r = new TokenResolver(deps);
     await r.resolve();
@@ -110,7 +112,7 @@ describe("TokenResolver.resolve — priority chain", () => {
 
 describe("TokenResolver.fromGhCli — TTL cache", () => {
   let realNow: number;
-  let exec: ReturnType<typeof vi.fn>;
+  let exec: AnyMock;
   let deps: TokenResolverDeps;
 
   beforeEach(() => {
@@ -167,10 +169,7 @@ describe("TokenResolver.store / clear", () => {
     expect(deps.exec).toHaveBeenCalledTimes(1);
 
     await r.store("  new-token  ");
-    expect(deps.secrets.store).toHaveBeenCalledWith(
-      "fordefiHotfix.githubPat",
-      "new-token"
-    );
+    expect(deps.secrets.store).toHaveBeenCalledWith("fordefiHotfix.githubPat", "new-token");
 
     await r.resolve();
     expect(deps.exec).toHaveBeenCalledTimes(2); // cache busted
@@ -182,9 +181,7 @@ describe("TokenResolver.store / clear", () => {
     await r.resolve();
 
     await r.clear();
-    expect(deps.secrets.delete).toHaveBeenCalledWith(
-      "fordefiHotfix.githubPat"
-    );
+    expect(deps.secrets.delete).toHaveBeenCalledWith("fordefiHotfix.githubPat");
 
     await r.resolve();
     expect(deps.exec).toHaveBeenCalledTimes(2);

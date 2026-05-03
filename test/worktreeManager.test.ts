@@ -73,9 +73,7 @@ describe("computeWorktreePath", () => {
   });
 
   it("strips a trailing backslash (windows paths)", () => {
-    expect(computeWorktreePath("C:\\src\\arnac\\")).toBe(
-      "C:\\src\\arnac-hotfix-worktree"
-    );
+    expect(computeWorktreePath("C:\\src\\arnac\\")).toBe("C:\\src\\arnac-hotfix-worktree");
   });
 });
 
@@ -179,9 +177,7 @@ describe("ensureHotfixWorktree", () => {
     expect(res.fallback).toBeUndefined();
     expect(res.path).toBe(expectedPath);
 
-    const addCalls = calls.filter(
-      (c) => c.args.includes("worktree") && c.args.includes("add")
-    );
+    const addCalls = calls.filter((c) => c.args.includes("worktree") && c.args.includes("add"));
     expect(addCalls).toHaveLength(0);
   });
 
@@ -209,9 +205,7 @@ describe("ensureHotfixWorktree", () => {
     expect(res.created).toBe(true);
     expect(res.path).toBe(expectedPath);
     expect(mkdirCalls).toContain(path.dirname(expectedPath));
-    const addCalls = calls.filter(
-      (c) => c.args.includes("worktree") && c.args.includes("add")
-    );
+    const addCalls = calls.filter((c) => c.args.includes("worktree") && c.args.includes("add"));
     expect(addCalls).toHaveLength(1);
     expect(addCalls[0].args).toEqual([
       "-C",
@@ -246,9 +240,7 @@ describe("ensureHotfixWorktree", () => {
     expect(res.fallback).toBeUndefined();
     expect(res.path).toBe(expectedPath);
 
-    const addCalls = calls.filter(
-      (c) => c.args.includes("worktree") && c.args.includes("add")
-    );
+    const addCalls = calls.filter((c) => c.args.includes("worktree") && c.args.includes("add"));
     expect(addCalls).toHaveLength(1);
     expect(addCalls[0].args).not.toContain("--detach");
     expect(addCalls[0].args).toContain("-B");
@@ -333,15 +325,11 @@ describe("ensureHotfixWorktree", () => {
     expect(res.created).toBe(true);
 
     const enable = calls.filter(
-      (c) =>
-        c.args.includes("config") &&
-        c.args.includes("extensions.worktreeConfig")
+      (c) => c.args.includes("config") && c.args.includes("extensions.worktreeConfig")
     );
     expect(enable).toHaveLength(1);
 
-    const insteadOf = calls.filter((c) =>
-      c.args.includes("url.https://github.com/.insteadOf")
-    );
+    const insteadOf = calls.filter((c) => c.args.includes("url.https://github.com/.insteadOf"));
     expect(insteadOf).toHaveLength(1);
     expect(insteadOf[0].args).toEqual([
       "-C",
@@ -381,9 +369,9 @@ describe("ensureHotfixWorktree", () => {
 
     const res = await ensureHotfixWorktree(repoRoot, deps, { ghPath: "" });
     expect(res.created).toBe(false);
-    expect(
-      calls.filter((c) => c.args.includes("url.https://github.com/.insteadOf"))
-    ).toHaveLength(1);
+    expect(calls.filter((c) => c.args.includes("url.https://github.com/.insteadOf"))).toHaveLength(
+      1
+    );
   });
 
   it("falls back to literal `gh` when ghPath option is empty", async () => {
@@ -424,9 +412,7 @@ describe("ensureHotfixWorktree", () => {
 
     await ensureHotfixWorktree(repoRoot, deps, { ghPath: "/usr/bin/gh" });
 
-    const insteadOf = calls.filter((c) =>
-      c.args.includes("url.https://github.com/.insteadOf")
-    );
+    const insteadOf = calls.filter((c) => c.args.includes("url.https://github.com/.insteadOf"));
     const helperWrites = calls.filter(
       (c) =>
         c.args.includes("credential.https://github.com.helper") &&
@@ -459,9 +445,7 @@ describe("ensureHotfixWorktree", () => {
     });
     expect(res.created).toBe(true);
 
-    const post = calls.filter(
-      (c) => c.file === "sh" && c.args[0] === "-c"
-    );
+    const post = calls.filter((c) => c.file === "sh" && c.args[0] === "-c");
     expect(post).toHaveLength(1);
     expect(post[0].args[1]).toBe("./atool prepare-codeenv");
     expect(post[0].cwd).toBe(wt);
@@ -486,9 +470,7 @@ describe("ensureHotfixWorktree", () => {
     });
     expect(res.created).toBe(false);
 
-    const post = calls.filter(
-      (c) => c.file === "sh" && c.args[0] === "-c"
-    );
+    const post = calls.filter((c) => c.file === "sh" && c.args[0] === "-c");
     expect(post).toHaveLength(0);
   });
 
@@ -558,11 +540,9 @@ describe("ensureHotfixWorktree", () => {
     const res = await ensureHotfixWorktree(repoRoot, deps, { ghPath: "gh" });
     expect(res.created).toBe(true);
     expect(res.fallback).toBeUndefined();
-    expect(
-      calls.filter((c) =>
-        c.args.includes("url.https://github.com/.insteadOf")
-      )
-    ).toHaveLength(0);
+    expect(calls.filter((c) => c.args.includes("url.https://github.com/.insteadOf"))).toHaveLength(
+      0
+    );
     expect(logs.some((l) => l.includes("https-rewrite skipped"))).toBe(true);
   });
 });

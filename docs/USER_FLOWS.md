@@ -6,17 +6,13 @@ This document walks through the main end-to-end flows in the extension. It mixes
 
 ## Figure A — Webview layout (concept)
 
-High-level idea of the **Hotfix PRs** side panel: hero, optional **Live watch** banner, search, hotfix CLI row, filter/sort row, then the PR list.
-
-![Webview layout overview](./assets/flow-webview-layout.png)
+High-level idea of the **Hotfix PRs** side panel (own activity bar icon): hero, optional **Live watch** banner, search, hotfix CLI row, filter/sort row, then the PR list.
 
 ---
 
 ## Figure B — Watch merged PRs → run CLI → outcome (concept)
 
 From **Start watch** through polling, merge detection, running the configured shell command, and **success / failure notifications** plus the **Fordefi Hotfix CLI** output channel.
-
-![Watch to CLI outcome overview](./assets/flow-watch-to-cli.png)
 
 ---
 
@@ -136,7 +132,7 @@ sequenceDiagram
 
 **Run mode** (`fordefiHotfix.debugTerminal`) decides where the post-merge command executes:
 
-- **`false`** (default, transparent mode): silent spawn; output goes to the *Fordefi Hotfix CLI* output channel; user sees only action prompts (YubiKey, conflict) and milestone notifications.
+- **`false`** (default, transparent mode): silent spawn; output goes to the _Fordefi Hotfix CLI_ output channel; user sees only action prompts (YubiKey, conflict) and milestone notifications.
 - **`true`** (debug terminal mode): a real integrated terminal so you can watch every line, interact with prompts, and answer YubiKey / `[y/n]` directly.
 
 The deprecated `fordefiHotfix.hotfixRunMode` setting still works but `debugTerminal` takes precedence.
@@ -147,14 +143,14 @@ Full logs: **View → Output → "Fordefi Hotfix CLI"** (and **"Fordefi Hotfix D
 
 ## Flow 6 — Persisted vs in-memory UI state
 
-| Data | Persists? | Where |
-|------|------------|--------|
-| Hotfix CLI row (env, draft, critical fast track) | Yes | `workspaceState` `fordefiHotfix.hotfixCliView` |
-| PR filter + sort | Yes | `workspaceState` `fordefiHotfix.prListView` |
-| Checkbox selection | Yes | `workspaceState` `fordefiHotfix.selectedPrs` |
-| Search query | No | In memory |
-| GitHub PAT override | Yes | Secret Storage |
-| Owner, repo, templates, etc. | Yes | VS Code settings |
+| Data                                             | Persists? | Where                                          |
+| ------------------------------------------------ | --------- | ---------------------------------------------- |
+| Hotfix CLI row (env, draft, critical fast track) | Yes       | `workspaceState` `fordefiHotfix.hotfixCliView` |
+| PR filter + sort                                 | Yes       | `workspaceState` `fordefiHotfix.prListView`    |
+| Checkbox selection                               | Yes       | `workspaceState` `fordefiHotfix.selectedPrs`   |
+| Search query                                     | No        | In memory                                      |
+| GitHub PAT override                              | Yes       | Secret Storage                                 |
+| Owner, repo, templates, etc.                     | Yes       | VS Code settings                               |
 
 ---
 
@@ -166,6 +162,8 @@ Typical commands (see `package.json`):
 - **Hotfix: Start / Stop watch** — toggle polling.
 - **Hotfix: Set / Clear stored GitHub token** — PAT vs `gh auth token`.
 - **Hotfix: Sync repo from Git** — set `owner` / `repo` from `origin` when it is a `github.com` remote.
+- **Hotfix: Doctor** — diagnostic report (gh, token chain, git, worktree, ssh, osascript, direnv).
+- **Hotfix: Toggle debug terminal mode** — flip transparent ↔ visible terminal on the fly.
 
 ---
 
@@ -175,12 +173,3 @@ Typical commands (see `package.json`):
 - **GitHub:** Renders Mermaid in `.md` files in the repository view.
 
 ---
-
-## Asset files
-
-| File | Role |
-|------|------|
-| `docs/assets/flow-webview-layout.png` | Illustrative webview layout |
-| `docs/assets/flow-watch-to-cli.png` | Illustrative watch → CLI → outcome |
-
-Figures are **stylized** guides, not pixel-perfect screenshots of your theme.

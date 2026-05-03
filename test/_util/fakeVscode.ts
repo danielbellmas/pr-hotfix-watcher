@@ -1,4 +1,6 @@
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
+
+type AnyMock = Mock<(...args: unknown[]) => unknown>;
 
 type Listener<T> = (e: T) => void;
 
@@ -27,29 +29,29 @@ class EventEmitter<T> {
 }
 
 type FakeTerminal = {
-  sendText: ReturnType<typeof vi.fn>;
-  show: ReturnType<typeof vi.fn>;
-  dispose: ReturnType<typeof vi.fn>;
+  sendText: AnyMock;
+  show: AnyMock;
+  dispose: AnyMock;
   shellIntegration: undefined;
   exitStatus: undefined;
 };
 
 type FakeOutputChannel = {
-  append: ReturnType<typeof vi.fn>;
-  appendLine: ReturnType<typeof vi.fn>;
-  show: ReturnType<typeof vi.fn>;
-  dispose: ReturnType<typeof vi.fn>;
-  clear: ReturnType<typeof vi.fn>;
+  append: AnyMock;
+  appendLine: AnyMock;
+  show: AnyMock;
+  dispose: AnyMock;
+  clear: AnyMock;
 };
 
 type FakeState = {
-  info: ReturnType<typeof vi.fn>;
-  warn: ReturnType<typeof vi.fn>;
-  error: ReturnType<typeof vi.fn>;
-  inputBox: ReturnType<typeof vi.fn>;
-  executeCommand: ReturnType<typeof vi.fn>;
-  createOutputChannel: ReturnType<typeof vi.fn>;
-  createTerminal: ReturnType<typeof vi.fn>;
+  info: AnyMock;
+  warn: AnyMock;
+  error: AnyMock;
+  inputBox: AnyMock;
+  executeCommand: AnyMock;
+  createOutputChannel: AnyMock;
+  createTerminal: AnyMock;
   configStore: Map<string, unknown>;
   secretsStore: Map<string, string>;
   workspaceStateStore: Map<string, unknown>;
@@ -153,9 +155,7 @@ export function getSetContextCalls(): Array<[string, unknown]> {
 }
 
 export function getLatestDeployRunningContext(): boolean | undefined {
-  const hits = getSetContextCalls().filter(
-    ([k]) => k === "fordefiHotfix.deployRunning"
-  );
+  const hits = getSetContextCalls().filter(([k]) => k === "fordefiHotfix.deployRunning");
   if (hits.length === 0) {
     return undefined;
   }
@@ -189,9 +189,7 @@ export function makeFakeExtensionContext(): FakeExtensionContext {
     },
     workspaceState: {
       get: <T>(k: string, fb?: T): T | undefined =>
-        state.workspaceStateStore.has(k)
-          ? (state.workspaceStateStore.get(k) as T)
-          : fb,
+        state.workspaceStateStore.has(k) ? (state.workspaceStateStore.get(k) as T) : fb,
       update: async (k, v) => {
         state.workspaceStateStore.set(k, v);
       },
@@ -228,8 +226,7 @@ export const vscodeModule: Record<string, unknown> = {
     showWarningMessage: (...args: unknown[]) => state.warn(...args),
     showErrorMessage: (...args: unknown[]) => state.error(...args),
     showInputBox: (...args: unknown[]) => state.inputBox(...args),
-    createOutputChannel: (...args: unknown[]) =>
-      state.createOutputChannel(...args),
+    createOutputChannel: (...args: unknown[]) => state.createOutputChannel(...args),
     createTerminal: (...args: unknown[]) => state.createTerminal(...args),
     registerWebviewViewProvider: () => ({ dispose: () => undefined }),
     onDidChangeActiveColorTheme: () => ({ dispose: () => undefined }),

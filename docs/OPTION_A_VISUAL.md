@@ -1,12 +1,10 @@
-# Option A: Load the extension (with pictures)
+# Option A: Load the extension
 
 ## Step 1 — Open the extension project folder
 
 Use **File → Open Folder…** (macOS: **File → Open Folder…**) and choose:
 
-`~/scripts/fordefi-hotfix-watcher`
-
-![Step 1: Open Folder](hotfix-ext-step1-open-folder.png)
+`~/scripts/hotfix-watcher`
 
 ---
 
@@ -16,28 +14,23 @@ Use **Run → Start Debugging**, or press **F5**.
 
 If VS Code asks for a launch configuration, pick **Run Extension**.
 
-![Step 2: Start Debugging / F5](hotfix-ext-step2-f5-debug.png)
-
-A **second** VS Code window opens. Its title bar usually includes **`[Extension Development Host]`**.  
-All remaining steps happen in **that** window—not the first one.
+A **second** VS Code window opens. Its title bar usually includes **`[Extension Development Host]`**.
+All remaining steps happen in **that** window — not the first one.
 
 ---
 
-## Step 3 — Open your real repo and show “Hotfix PRs”
+## Step 3 — Open your real repo and show "Hotfix PRs"
 
 In the **[Extension Development Host]** window:
 
-1. **File → Open Folder…** again, and open your **clone of the monorepo** (where `./fcli` lives), e.g. `~/go/src/arnac-second` or `arnac`.  
+1. **File → Open Folder…** again, and open your **clone of the monorepo** (where `./fcli` lives), e.g. `~/go/src/arnac-second` or `arnac`.
    The extension only needs a workspace so **Repo root** can default to that folder; you can also set `fordefiHotfix.repoRoot` in settings later.
 
-2. In the **Activity Bar** (far left), click the **Explorer** icon (two documents).
+2. In the **Activity Bar** (far left), click the **Hotfix** icon (dedicated activity bar entry added by the extension).
 
-3. In the **Explorer** sidebar, **scroll down**. Under the same Explorer area as your files, VS Code adds a section named **“Hotfix PRs”**.  
-   **Click “Hotfix PRs” once** (or expand it). That loads the extension view.
+3. The **Hotfix PRs** webview loads in the sidebar.
 
-![Step 3: Find Hotfix PRs in Explorer](hotfix-ext-step3-hotfix-prs-view.png)
-
-### If you still do not see “Hotfix PRs”
+### If you still do not see the Hotfix icon
 
 - Confirm you are in the window whose title says **`[Extension Development Host]`**.
 - **View → Appearance → Primary Side Bar** (ensure the side bar is visible).

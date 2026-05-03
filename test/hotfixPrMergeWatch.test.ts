@@ -57,9 +57,7 @@ describe("phaseFromHotfixSettled", () => {
 
   it("delegates to phaseFromHotfixPull for fulfilled results", () => {
     const p = pull({ merged_at: "2026-04-21T10:00:00Z" });
-    expect(
-      phaseFromHotfixSettled({ status: "fulfilled", value: p })
-    ).toEqual({
+    expect(phaseFromHotfixSettled({ status: "fulfilled", value: p })).toEqual({
       kind: "merged",
       pull: p,
     });

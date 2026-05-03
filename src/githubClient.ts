@@ -35,7 +35,10 @@ export function isHotfixTitle(title: string): boolean {
 }
 
 export class GitHubError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
     super(message);
     this.name = "GitHubError";
   }
@@ -52,11 +55,7 @@ export function setAuthFailureHandler(fn: (() => void) | undefined): void {
   authFailureHandler = fn;
 }
 
-async function githubJson<T>(
-  path: string,
-  token: string,
-  init?: RequestInit
-): Promise<T> {
+async function githubJson<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`https://api.github.com${path}`, {
     ...init,
     headers: {
@@ -183,8 +182,5 @@ export async function getPullRequest(
   repo: string,
   number: number
 ): Promise<GitHubPull> {
-  return githubJson<GitHubPull>(
-    `/repos/${owner}/${repo}/pulls/${number}`,
-    token
-  );
+  return githubJson<GitHubPull>(`/repos/${owner}/${repo}/pulls/${number}`, token);
 }

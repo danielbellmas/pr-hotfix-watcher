@@ -9,18 +9,12 @@ import {
   getWorkflowsRepoConfig,
   getWorktreePostCreateCommand,
 } from "./config";
-import {
-  describeDeployOutcome,
-  orchestrateDeployAfterFcli,
-} from "./deployOrchestrator";
+import { describeDeployOutcome, orchestrateDeployAfterFcli } from "./deployOrchestrator";
 import { runHotfixDeploy } from "./deployRun";
 import { getPullRequest } from "./githubClient";
 import { buildHotfixCliSuffix, type HotfixCliOptions } from "./hotfixCli";
 import { watchHotfixPrMerge } from "./hotfixPrMergeWatch";
-import {
-  runHotfixShellCommandAfterMerge,
-  type HotfixShellRunResult,
-} from "./hotfixRun";
+import { runHotfixShellCommandAfterMerge, type HotfixShellRunResult } from "./hotfixRun";
 import { parseGithubPullUrl } from "./hotfixRunHelpers";
 import { killActiveChild } from "./runRegistry";
 import { phaseFromSettledPulls } from "./watchPoll";
@@ -55,10 +49,7 @@ export type WatchSessionUi = {
   info: (msg: string) => void;
   warn: (msg: string) => void;
   error: (msg: string) => void;
-  askHotfixUrl: (fb: {
-    owner: string;
-    repo: string;
-  }) => Promise<string | undefined>;
+  askHotfixUrl: (fb: { owner: string; repo: string }) => Promise<string | undefined>;
   /** Mirror `deployRunning` to a context key so the view-title Stop button
    *  hides itself once a deploy is dispatched. */
   setDeployRunningContext: (running: boolean) => void;
@@ -106,8 +97,7 @@ export class WatchSession {
   private readonly pollGate = new MergeHandoffGate();
   /** Frozen at `start()` so toggling env / deploy mid-watch can't alter the
    *  in-flight session. */
-  private watchCtx: { cli: HotfixCliOptions; prNumbers: number[] } | null =
-    null;
+  private watchCtx: { cli: HotfixCliOptions; prNumbers: number[] } | null = null;
   private deployRunning = false;
   private deployPhase: DeployPhase | null = null;
   private statusMessage = "";
@@ -151,10 +141,7 @@ export class WatchSession {
     this.statusMessage = `Waiting on #${prNumbers.join(", #")}…`;
     this.deps.onChange();
     void this.pollOnce();
-    this.pollTimer = setInterval(
-      () => void this.pollOnce(),
-      getPollIntervalMs()
-    );
+    this.pollTimer = setInterval(() => void this.pollOnce(), getPollIntervalMs());
   }
 
   /**
@@ -208,9 +195,7 @@ export class WatchSession {
    *  `liveCli` so the banner can't disagree with the in-flight run. */
   buildPanelState(
     liveCli: HotfixCliOptions,
-    lookupRow: (
-      n: number
-    ) => { title: string; state: string; merged: boolean } | undefined
+    lookupRow: (n: number) => { title: string; state: string; merged: boolean } | undefined
   ): WatchPanelState | null {
     if (!this.watching) {
       return null;
@@ -284,11 +269,8 @@ export class WatchSession {
           this.watchTarget.map((n) => getPullRequest(token, owner, repo, n))
         );
         const allFulfilled = settled.every(
-          (
-            r
-          ): r is PromiseFulfilledResult<
-            Awaited<ReturnType<typeof getPullRequest>>
-          > => r.status === "fulfilled"
+          (r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof getPullRequest>>> =>
+            r.status === "fulfilled"
         );
         if (allFulfilled) {
           this.watchEntries = settled.map((r, i) => {
@@ -304,17 +286,17 @@ export class WatchSession {
         const phase = phaseFromSettledPulls(this.watchTarget, settled);
         if (phase.kind === "stop_404") {
           this.stop();
-          this.deps.ui.error(
-            `Hotfix watch stopped: PR #${phase.prNumber} was not found.`
-          );
+          this.deps.ui.error(`Hotfix watch stopped: PR #${phase.prNumber} was not found.`);
           return;
         }
         if (phase.kind === "poll_error") {
           this.consecutivePollErrors++;
           this.statusMessage = `Hotfix watch poll failed — retrying… (${phase.message})`;
           this.deps.onChange();
-          if (this.consecutivePollErrors === 1 ||
-              this.consecutivePollErrors % POLL_ERROR_TOAST_EVERY === 0) {
+          if (
+            this.consecutivePollErrors === 1 ||
+            this.consecutivePollErrors % POLL_ERROR_TOAST_EVERY === 0
+          ) {
             this.deps.ui.error(`Hotfix watch poll failed: ${phase.message}`);
           }
           return;
@@ -323,9 +305,7 @@ export class WatchSession {
         if (phase.kind === "stop_closed") {
           this.stop();
           const nums = phase.prNumbers.join(", #");
-          this.deps.ui.warn(
-            `Hotfix watch stopped: PR #${nums} closed without merging.`
-          );
+          this.deps.ui.warn(`Hotfix watch stopped: PR #${nums} closed without merging.`);
           return;
         }
         if (phase.kind === "continue") {
@@ -342,8 +322,10 @@ export class WatchSession {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.consecutivePollErrors++;
-        if (this.consecutivePollErrors === 1 ||
-            this.consecutivePollErrors % POLL_ERROR_TOAST_EVERY === 0) {
+        if (
+          this.consecutivePollErrors === 1 ||
+          this.consecutivePollErrors % POLL_ERROR_TOAST_EVERY === 0
+        ) {
           this.deps.ui.error(`Hotfix watch poll failed: ${msg}`);
         }
       }
@@ -365,9 +347,7 @@ export class WatchSession {
     }
     this.watchTarget = [];
     this.watchEntries = [];
-    this.statusMessage = deploy
-      ? "Running hotfix CLI, then watching hotfix PR to deploy…"
-      : "";
+    this.statusMessage = deploy ? "Running hotfix CLI, then watching hotfix PR to deploy…" : "";
     if (!deploy) {
       this.watching = false;
     }
@@ -397,9 +377,7 @@ export class WatchSession {
         fallback: worktree.fallback,
         fallbackDetail: worktree.fallbackDetail,
         notificationKey: `fordefiHotfix.worktree.${cwd}.notified`,
-        context: this.deps.globalState
-          ? { globalState: this.deps.globalState }
-          : undefined,
+        context: this.deps.globalState ? { globalState: this.deps.globalState } : undefined,
       },
     });
     if (this.aborted) {
@@ -467,11 +445,7 @@ export class WatchSession {
             if (!this.deployPhase) {
               return;
             }
-            if (
-              phase.kind === "waiting" ||
-              phase.kind === "merged" ||
-              phase.kind === "closed"
-            ) {
+            if (phase.kind === "waiting" || phase.kind === "merged" || phase.kind === "closed") {
               const p = phase.pull;
               this.deployPhase.title = p.title;
               this.deployPhase.state = p.state;
@@ -508,9 +482,7 @@ export class WatchSession {
     this.applyDeployOutcome(result);
   }
 
-  private applyDeployOutcome(
-    result: Awaited<ReturnType<typeof orchestrateDeployAfterFcli>>
-  ): void {
+  private applyDeployOutcome(result: Awaited<ReturnType<typeof orchestrateDeployAfterFcli>>): void {
     const desc = describeDeployOutcome(result);
     if (desc.deployEnded) {
       this.deployRunning = false;
@@ -557,11 +529,7 @@ export function createDefaultWatchSessionUi(): WatchSessionUi {
     error: (msg) => void vscode.window.showErrorMessage(msg),
     askHotfixUrl: (fb) => askForHotfixPrUrl(fb),
     setDeployRunningContext: (running) =>
-      void vscode.commands.executeCommand(
-        "setContext",
-        "fordefiHotfix.deployRunning",
-        running
-      ),
+      void vscode.commands.executeCommand("setContext", "fordefiHotfix.deployRunning", running),
   };
 }
 

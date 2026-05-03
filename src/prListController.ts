@@ -17,10 +17,7 @@ import {
   getRepoConfig,
   resolveGitHubToken,
 } from "./config";
-import {
-  normalizeHotfixCliOptions,
-  type HotfixCliOptions,
-} from "./hotfixCli";
+import { normalizeHotfixCliOptions, type HotfixCliOptions } from "./hotfixCli";
 import {
   applyPrViewFilterSort,
   normalizePrListViewOptions,
@@ -86,9 +83,7 @@ export type HotfixPrViewState = {
 const SELECTED_PRS_KEY = "fordefiHotfix.selectedPrs";
 
 export class PrListController {
-  private _onDidChangeTreeData = new vscode.EventEmitter<
-    PrRow | undefined | void
-  >();
+  private _onDidChangeTreeData = new vscode.EventEmitter<PrRow | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private rows: PrRow[] = [];
@@ -114,8 +109,7 @@ export class PrListController {
   private readonly watchSession: WatchSession;
 
   constructor(private readonly context: vscode.ExtensionContext) {
-    const savedSelected =
-      this.context.workspaceState.get<number[]>(SELECTED_PRS_KEY);
+    const savedSelected = this.context.workspaceState.get<number[]>(SELECTED_PRS_KEY);
     if (savedSelected?.length) {
       for (const n of savedSelected) this.selected.add(n);
     }
@@ -123,13 +117,10 @@ export class PrListController {
     const saved = this.context.workspaceState.get<Partial<HotfixCliOptions>>(
       "fordefiHotfix.hotfixCliView"
     );
-    this.hotfixCli = normalizeHotfixCliOptions(
-      saved ?? undefined,
-      getHotfixCliOptionsFromConfig()
+    this.hotfixCli = normalizeHotfixCliOptions(saved ?? undefined, getHotfixCliOptionsFromConfig());
+    const savedList = this.context.workspaceState.get<Partial<PrListViewOptions>>(
+      "fordefiHotfix.prListView"
     );
-    const savedList = this.context.workspaceState.get<
-      Partial<PrListViewOptions>
-    >("fordefiHotfix.prListView");
     this.prListView = normalizePrListViewOptions(savedList ?? undefined);
     this.watchSession = new WatchSession({
       ui: createDefaultWatchSessionUi(),
@@ -206,10 +197,7 @@ export class PrListController {
 
   setHotfixCliOptions(partial: Partial<HotfixCliOptions>): void {
     const merged = { ...this.hotfixCli, ...partial };
-    this.hotfixCli = normalizeHotfixCliOptions(
-      merged,
-      getHotfixCliOptionsFromConfig()
-    );
+    this.hotfixCli = normalizeHotfixCliOptions(merged, getHotfixCliOptionsFromConfig());
     void this.context.workspaceState.update("fordefiHotfix.hotfixCliView", {
       ...this.hotfixCli,
     });
@@ -293,12 +281,7 @@ export class PrListController {
   }
 
   private buildDisplayRows(): PrRow[] {
-    const merged = buildDisplayPrRows(
-      this.rows,
-      this.remoteRows,
-      this.searchQuery,
-      this.selected
-    );
+    const merged = buildDisplayPrRows(this.rows, this.remoteRows, this.searchQuery, this.selected);
     const sorted = applyPrViewFilterSort(
       merged,
       this.prListView.statusFilter,
@@ -320,22 +303,13 @@ export class PrListController {
         return;
       }
       const { owner, repo } = getRepoConfig();
-      const items = await searchRepoPullRequests(
-        token,
-        owner,
-        repo,
-        trimmed,
-        30
-      );
+      const items = await searchRepoPullRequests(token, owner, repo, trimmed, 30);
       if (gen !== this.remoteSearchGen || trimmed !== this.searchQuery.trim()) {
         return;
       }
       this.remoteRows = items
         .map((it) => this.rowFromSearchItem(it))
-        .filter(
-          (row) =>
-            (row.state === "open" || row.mergedAt) && !isHotfixTitle(row.title)
-        );
+        .filter((row) => (row.state === "open" || row.mergedAt) && !isHotfixTitle(row.title));
       this.searchRemoteError = null;
     } catch (e) {
       if (gen !== this.remoteSearchGen || trimmed !== this.searchQuery.trim()) {
@@ -387,7 +361,7 @@ export class PrListController {
       const token = await resolveGitHubToken(this.context);
       if (!token) {
         this.loadError =
-          "No GitHub token. Run `gh auth login` in a terminal, or use \"Hotfix: Set GitHub token\" for a PAT override.";
+          'No GitHub token. Run `gh auth login` in a terminal, or use "Hotfix: Set GitHub token" for a PAT override.';
         this.rows = [];
         return;
       }
@@ -396,13 +370,7 @@ export class PrListController {
       const limit = getRecentPrCount();
       try {
         this.login = await getAuthenticatedLogin(token);
-        const searchItems = await searchAuthorPullRequests(
-          token,
-          owner,
-          repo,
-          this.login,
-          limit
-        );
+        const searchItems = await searchAuthorPullRequests(token, owner, repo, this.login, limit);
         const orderedNumbers: number[] = [];
         const seen = new Set<number>();
         for (const it of searchItems) {
@@ -469,9 +437,7 @@ export class PrListController {
     }
     const nums = this.getSelectedNumbers();
     if (nums.length === 0) {
-      void vscode.window.showWarningMessage(
-        "Select at least one PR to watch."
-      );
+      void vscode.window.showWarningMessage("Select at least one PR to watch.");
       return;
     }
     const frozenCli: HotfixCliOptions = { ...this.hotfixCli };
@@ -530,8 +496,6 @@ export function capDisplayRows(
     return head;
   }
   const inHead = new Set(head.map((r) => r.number));
-  const extras = rows
-    .slice(limit)
-    .filter((r) => selected.has(r.number) && !inHead.has(r.number));
+  const extras = rows.slice(limit).filter((r) => selected.has(r.number) && !inHead.has(r.number));
   return [...head, ...extras];
 }

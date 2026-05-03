@@ -1,18 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import * as os from "node:os";
 import * as path from "node:path";
-import {
-  buildDeployShellScript,
-  type DeployTargets,
-} from "../src/deployWorkflow";
+import { buildDeployShellScript, type DeployTargets } from "../src/deployWorkflow";
 
 /**
  * Stub `gh` script. Mirrors just enough of `gh`'s CLI surface for the
@@ -112,14 +103,10 @@ maybeDescribe("buildDeployShellScript(both) — real shell + stub gh", () => {
     });
   };
 
-  const readLog = (): string =>
-    readFileSync(path.join(stateDir, "log.txt"), "utf8");
+  const readLog = (): string => readFileSync(path.join(stateDir, "log.txt"), "utf8");
 
   const writeSchedule = (name: string, lines: string[]): void => {
-    writeFileSync(
-      path.join(stateDir, name),
-      lines.join("\n") + (lines.length ? "\n" : "")
-    );
+    writeFileSync(path.join(stateDir, name), lines.join("\n") + (lines.length ? "\n" : ""));
   };
 
   it("success: after pre completes successfully, prod is dispatched", () => {
@@ -139,12 +126,8 @@ maybeDescribe("buildDeployShellScript(both) — real shell + stub gh", () => {
     // `"$*"` strips the original single quotes when bash expanded argv;
     // match the unquoted form that the stub actually logs.
     expect(log.match(/workflow run pre-hotfix\.yml/g) ?? []).toHaveLength(1);
-    expect(
-      log.match(/workflow run production-hotfix\.yml/g) ?? []
-    ).toHaveLength(1);
-    expect(log.indexOf("run list")).toBeLessThan(
-      log.indexOf("workflow run pre-hotfix.yml")
-    );
+    expect(log.match(/workflow run production-hotfix\.yml/g) ?? []).toHaveLength(1);
+    expect(log.indexOf("run list")).toBeLessThan(log.indexOf("workflow run pre-hotfix.yml"));
   });
 
   it("race guard: polls repeatedly until a databaseId > prev appears", () => {
@@ -158,9 +141,7 @@ maybeDescribe("buildDeployShellScript(both) — real shell + stub gh", () => {
     const res = runScript();
     expect(res.status).toBe(0);
 
-    const newIdCounter = Number(
-      readFileSync(path.join(stateDir, "newid_counter"), "utf8").trim()
-    );
+    const newIdCounter = Number(readFileSync(path.join(stateDir, "newid_counter"), "utf8").trim());
     expect(newIdCounter).toBe(3);
 
     // The "watching ... run id=101" line is produced by the generated
@@ -168,9 +149,7 @@ maybeDescribe("buildDeployShellScript(both) — real shell + stub gh", () => {
     // the stub-gh invocation log.
     expect(res.stdout).toMatch(/watching pre-hotfix\.yml run id=101/);
     const log = readLog();
-    expect(
-      log.match(/workflow run production-hotfix\.yml/g) ?? []
-    ).toHaveLength(1);
+    expect(log.match(/workflow run production-hotfix\.yml/g) ?? []).toHaveLength(1);
   });
 
   it("failure: pre run fails → script exits non-zero and prod is NEVER dispatched", () => {
@@ -203,12 +182,7 @@ maybeDescribe("buildDeployShellScript(both) — real shell + stub gh", () => {
   it("status polls correctly across multiple iterations before success", () => {
     writeFileSync(path.join(stateDir, "snapshot_id"), "5\n");
     writeSchedule("newid_schedule", ["10"]);
-    writeSchedule("status_schedule", [
-      "queued",
-      "in_progress",
-      "in_progress",
-      "completed",
-    ]);
+    writeSchedule("status_schedule", ["queued", "in_progress", "in_progress", "completed"]);
     writeSchedule("conclusion_schedule", ["-", "-", "-", "success"]);
 
     const res = runScript();

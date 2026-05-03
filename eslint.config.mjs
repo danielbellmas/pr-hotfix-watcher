@@ -3,14 +3,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [
-      "out/**",
-      "out-test/**",
-      "node_modules/**",
-      "test/e2e/out/**",
-      "*.vsix",
-      "media/**",
-    ],
+    ignores: ["out/**", "out-test/**", "node_modules/**", "test/e2e/out/**", "*.vsix", "media/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

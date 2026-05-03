@@ -11,7 +11,7 @@ Sidebar view that lists **your** recent pull requests in a GitHub repo, lets you
 ## Setup
 
 1. Install the extension (from `.vsix` or after publishing).
-2. Open the **Explorer** side bar → **Hotfix PRs** view.
+2. Open the **Hotfix** activity bar (dedicated icon on the far-left) → **Hotfix PRs** view.
 3. **Auth:** With **[GitHub CLI](https://cli.github.com/)** installed, run `gh auth login` in a terminal. The extension reads **`gh auth token`** first (same as `./fcli`). If `gh` is not on your `PATH` inside VS Code, use **“Hotfix: Set GitHub token”** to store a PAT override in Secret Storage.
 4. Set **fordefiHotfix.repoRoot** to the absolute path of your git checkout (or open that folder as the workspace; an empty `repoRoot` uses the first workspace folder).
 5. Optional: **“Hotfix: Set owner/repo from git remote”** sets `fordefiHotfix.owner` / `fordefiHotfix.repo` from `origin` (GitHub URLs only).
@@ -23,40 +23,45 @@ Sidebar view that lists **your** recent pull requests in a GitHub repo, lets you
 3. **Start watching** — the extension polls until every selected PR has merged, then opens an integrated terminal and sends the configured command line.
 4. **Stop** cancels polling.
 
-**Add PR by number** includes a PR that is outside the recent list (it stays on the list until the next refresh removes it if it is no longer in the search window — manual numbers are merged into refresh).
-
 ## Settings
 
 All settings live under **Hotfix** in `Settings → Extensions → Fordefi Hotfix`. Highlights:
 
-| ID | Default | Purpose |
-|----|---------|---------|
-| `fordefiHotfix.owner` / `.repo` | `arnac-io` / `arnac` | Target GitHub repo |
-| `fordefiHotfix.recentPrCount` | `30` | Latest PRs by update time (max 100) |
-| `fordefiHotfix.displayPrLimit` | `10` | Max PR rows in the sidebar (checked PRs always stay visible) |
-| `fordefiHotfix.pollIntervalSeconds` | `60` | Merge poll interval while watching |
-| `fordefiHotfix.repoRoot` | `""` | Clone path (empty = first workspace folder) |
-| `fordefiHotfix.commandTemplate` | see `package.json` | Must contain `{prNumbers}`. Also: `{repoRoot}`, `{prList}`, `{owner}`, `{repo}`, `{hotfixSuffix}` |
-| `fordefiHotfix.debugTerminal` | `false` | `false` = transparent (silent, notifications only); `true` = integrated terminal (YubiKey-friendly, interactive) |
-| `fordefiHotfix.hotfixRunMode` | `transparent` | **Deprecated** — prefer `debugTerminal`. `transparent` / `integratedTerminal` / `background` |
-| `fordefiHotfix.hotfixTerminalName` | `Hotfix CLI` | Terminal tab name in `integratedTerminal` mode |
-| `fordefiHotfix.hotfixEnv` | `pre` | Default for the **env** dropdown (`pre`, `prod`, `both`) |
-| `fordefiHotfix.hotfixDraft` | `false` | Default for the **draft** checkbox |
-| `fordefiHotfix.hotfixCriticalFastTrack` | `false` | Default for the **critical fast track** checkbox |
-| `fordefiHotfix.hotfixDeploy` | `false` | Default for the **deploy** checkbox (post-merge workflow dispatch) |
-| `fordefiHotfix.workflowsOwner` / `.workflowsRepo` | `arnac-io` / `workflows` | Repo that hosts the deploy workflows |
-| `fordefiHotfix.preHotfixWorkflow` | `pre-hotfix.yml` | Workflow file dispatched for `--env pre` |
-| `fordefiHotfix.productionHotfixWorkflow` | `production-hotfix.yml` | Workflow file dispatched for `--env prod` |
-| `fordefiHotfix.workflowRef` | `main` | `gh workflow run --ref` value |
-| `fordefiHotfix.hotfixTerminalAutoFirstConfirm` | `true` | Auto-send the first prompt confirmation in `integratedTerminal` mode |
-| `fordefiHotfix.hotfixTerminalAutoFirstConfirmText` | `y` | Keystrokes for that first prompt |
-| `fordefiHotfix.hotfixTerminalAutoFirstConfirmDelayMs` | `600` | Delay before sending it |
-| `fordefiHotfix.githubPat` | `""` | Optional PAT override (prefer `gh auth login`) |
-| `fordefiHotfix.ghPath` | `""` | Full path to `gh` when `PATH` doesn't include it (common on macOS when VS Code/Cursor is opened from the Dock) |
+| ID                                                    | Default                   | Purpose                                                                                                                    |
+| ----------------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `fordefiHotfix.owner` / `.repo`                       | `arnac-io` / `arnac`      | Target GitHub repo                                                                                                         |
+| `fordefiHotfix.recentPrCount`                         | `30`                      | Latest PRs by update time (max 100)                                                                                        |
+| `fordefiHotfix.displayPrLimit`                        | `10`                      | Max PR rows in the sidebar (checked PRs always stay visible)                                                               |
+| `fordefiHotfix.pollIntervalSeconds`                   | `60`                      | Merge poll interval while watching                                                                                         |
+| `fordefiHotfix.repoRoot`                              | `""`                      | Clone path (empty = first workspace folder)                                                                                |
+| `fordefiHotfix.commandTemplate`                       | see `package.json`        | Must contain `{prNumbers}`. Also: `{repoRoot}`, `{prList}`, `{owner}`, `{repo}`, `{hotfixSuffix}`                          |
+| `fordefiHotfix.debugTerminal`                         | `false`                   | `false` = transparent (silent, notifications only); `true` = integrated terminal (YubiKey-friendly, interactive)           |
+| `fordefiHotfix.hotfixRunMode`                         | `transparent`             | **Deprecated** — prefer `debugTerminal`. `transparent` / `integratedTerminal` / `background`                               |
+| `fordefiHotfix.hotfixTerminalName`                    | `Hotfix CLI`              | Terminal tab name in `integratedTerminal` mode                                                                             |
+| `fordefiHotfix.hotfixEnv`                             | `pre`                     | Default for the **env** dropdown (`pre`, `prod`, `both`)                                                                   |
+| `fordefiHotfix.hotfixDraft`                           | `false`                   | Default for the **draft** checkbox                                                                                         |
+| `fordefiHotfix.hotfixCriticalFastTrack`               | `false`                   | Default for the **critical fast track** checkbox                                                                           |
+| `fordefiHotfix.hotfixDeploy`                          | `false`                   | Default for the **deploy** checkbox (post-merge workflow dispatch)                                                         |
+| `fordefiHotfix.workflowsOwner` / `.workflowsRepo`     | `arnac-io` / `workflows`  | Repo that hosts the deploy workflows                                                                                       |
+| `fordefiHotfix.preHotfixWorkflow`                     | `pre-hotfix.yml`          | Workflow file dispatched for `--env pre`                                                                                   |
+| `fordefiHotfix.productionHotfixWorkflow`              | `production-hotfix.yml`   | Workflow file dispatched for `--env prod`                                                                                  |
+| `fordefiHotfix.workflowRef`                           | `main`                    | `gh workflow run --ref` value                                                                                              |
+| `fordefiHotfix.hotfixTerminalAutoFirstConfirm`        | `true`                    | Auto-send the first prompt confirmation in `integratedTerminal` mode                                                       |
+| `fordefiHotfix.hotfixTerminalAutoFirstConfirmText`    | `y`                       | Keystrokes for that first prompt                                                                                           |
+| `fordefiHotfix.hotfixTerminalAutoFirstConfirmDelayMs` | `600`                     | Delay before sending it                                                                                                    |
+| `fordefiHotfix.githubPat`                             | `""`                      | Optional PAT override (prefer `gh auth login`)                                                                             |
+| `fordefiHotfix.ghPath`                                | `""`                      | Full path to `gh` when `PATH` doesn't include it (common on macOS when VS Code/Cursor is opened from the Dock)             |
+| `fordefiHotfix.worktreeSshKey`                        | `""`                      | SSH private key used only inside the hotfix worktree (e.g. `~/.ssh/id_ed25519_sk_notouch`); empty leaves git/ssh untouched |
+| `fordefiHotfix.worktreePostCreateCommand`             | `./atool prepare-codeenv` | Shell command run once inside the worktree after `git worktree add`; empty disables                                        |
 
 Token resolution order: **`gh auth token`** (see `fordefiHotfix.ghPath`) → **Secret Storage** (“Hotfix: Set GitHub token”) → `fordefiHotfix.githubPat` → process env `GITHUB_ACCESS_TOKEN`.
 
 If you see **401 Bad credentials**: run `gh auth status` in a terminal. Prefer fixing **`gh`** (login or `fordefiHotfix.ghPath`) so the extension uses the same token as the CLI. If you previously saved a bad PAT in VS Code, run **Hotfix: Clear stored GitHub token (use gh CLI again)** or remove `fordefiHotfix.githubPat` from settings.
+
+### Additional commands
+
+- **Hotfix: Doctor** — run a diagnostic report covering `gh`, token chain, git, worktree, ssh key permissions, `osascript`, and `direnv`. Output goes to the _Fordefi Hotfix Doctor_ channel.
+- **Hotfix: Toggle debug terminal mode** — flip between transparent (silent) and visible integrated-terminal mode on the fly; also reflected in the status bar.
 
 ## Command template
 
@@ -75,7 +80,19 @@ human-readable output goes to stderr, no browser opens, and a single JSON line
 is written to stdout describing every hotfix PR that was created:
 
 ```json
-{ "prs": [ { "environment": "pre", "pr_number": 123, "html_url": "…", "release_branch": "…", "hotfix_branch": "…", "draft": false } ], "source_pr_numbers": [42] }
+{
+  "prs": [
+    {
+      "environment": "pre",
+      "pr_number": 123,
+      "html_url": "…",
+      "release_branch": "…",
+      "hotfix_branch": "…",
+      "draft": false
+    }
+  ],
+  "source_pr_numbers": [42]
+}
 ```
 
 The watcher prefers this payload when it is present and falls back to the

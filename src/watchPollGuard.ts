@@ -39,9 +39,7 @@ export class MergeHandoffGate {
     return this.mergeHandled;
   }
 
-  async runPoll(
-    body: (ctx: PollContext) => Promise<void>
-  ): Promise<boolean> {
+  async runPoll(body: (ctx: PollContext) => Promise<void>): Promise<boolean> {
     if (this.pollInFlight || this.mergeHandled) {
       return false;
     }

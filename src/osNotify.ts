@@ -34,9 +34,7 @@ export interface DeployNotification {
 
 const MAX_SPAWN_ERROR_LEN = 120;
 
-export function buildDeployNotification(
-  input: DeployNotificationInput
-): DeployNotification {
+export function buildDeployNotification(input: DeployNotificationInput): DeployNotification {
   const { outcome, env, sourcePrNumbers } = input;
   const prList = formatSourcePrs(sourcePrNumbers);
   switch (outcome.kind) {
@@ -120,9 +118,7 @@ export function buildOsNotificationScript(args: {
 }): string {
   const title = escapeAppleScript(args.title);
   const body = escapeAppleScript(args.body);
-  const subtitle = args.subtitle
-    ? escapeAppleScript(args.subtitle)
-    : undefined;
+  const subtitle = args.subtitle ? escapeAppleScript(args.subtitle) : undefined;
   return subtitle
     ? `display notification "${body}" with title "${title}" subtitle "${subtitle}"`
     : `display notification "${body}" with title "${title}"`;
@@ -156,15 +152,11 @@ export function showOsNotification(args: OsNotificationArgs): void {
     proc.on("close", (code) => {
       if (code !== 0) {
         const detail = stderr.trim();
-        args.log?.(
-          `[osNotify] osascript exit ${code}${detail ? `: ${detail}` : ""}`
-        );
+        args.log?.(`[osNotify] osascript exit ${code}${detail ? `: ${detail}` : ""}`);
       }
     });
   } catch (err) {
-    args.log?.(
-      `[osNotify] caught: ${err instanceof Error ? err.message : String(err)}`
-    );
+    args.log?.(`[osNotify] caught: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 

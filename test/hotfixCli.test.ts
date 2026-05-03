@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildHotfixCliSuffix,
-  normalizeHotfixCliOptions,
-} from "../src/hotfixCli";
+import { buildHotfixCliSuffix, normalizeHotfixCliOptions } from "../src/hotfixCli";
 
 const defaults = {
   env: "pre" as const,
@@ -100,9 +97,7 @@ describe("normalizeHotfixCliOptions", () => {
   });
 
   it("accepts valid env and booleans", () => {
-    expect(
-      normalizeHotfixCliOptions({ env: "prod", draft: true }, defaults)
-    ).toEqual({
+    expect(normalizeHotfixCliOptions({ env: "prod", draft: true }, defaults)).toEqual({
       env: "prod",
       draft: true,
       criticalFastTrack: false,
@@ -132,9 +127,7 @@ describe("normalizeHotfixCliOptions", () => {
 
   it("rejects invalid env", () => {
     // @ts-expect-error deliberate bad value from persisted state
-    expect(normalizeHotfixCliOptions({ env: "staging" }, defaults)).toEqual(
-      defaults
-    );
+    expect(normalizeHotfixCliOptions({ env: "staging" }, defaults)).toEqual(defaults);
   });
 
   it("ignores non-boolean draft and criticalFastTrack from bad persisted JSON", () => {

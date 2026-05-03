@@ -36,9 +36,7 @@ const workflowsTargets: DeployTargets = {
  * no-op successes. Individual tests override only the fields they care about,
  * keeping assertions focused.
  */
-function makeDeps(
-  overrides: Partial<DeployOrchestratorDeps> = {}
-): DeployOrchestratorDeps {
+function makeDeps(overrides: Partial<DeployOrchestratorDeps> = {}): DeployOrchestratorDeps {
   return {
     resolveToken: vi.fn(async () => "t0k3n"),
     watchPr: vi.fn(
@@ -47,9 +45,7 @@ function makeDeps(
         pull: fakePull,
       })
     ),
-    runDeploy: vi.fn(
-      async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
-    ),
+    runDeploy: vi.fn(async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })),
     askForHotfixUrl: vi.fn(async () => undefined),
     pollIntervalMs: 1,
     workflowsTargets,
@@ -58,9 +54,7 @@ function makeDeps(
   } satisfies DeployOrchestratorDeps;
 }
 
-function runResultWith(
-  overrides: Partial<HotfixShellRunResult>
-): HotfixShellRunResult {
+function runResultWith(overrides: Partial<HotfixShellRunResult>): HotfixShellRunResult {
   return {
     exitCode: 0,
     ok: true,
@@ -93,10 +87,12 @@ describe("orchestrateDeployAfterFcli", () => {
   });
 
   it("treats exitCode=undefined as proceed (shell-integration fallback path)", async () => {
-    const runDeploy = vi.fn(async (): Promise<DeployRunResult> => ({
-      exitCode: 0,
-      ok: true,
-    }));
+    const runDeploy = vi.fn(
+      async (): Promise<DeployRunResult> => ({
+        exitCode: 0,
+        ok: true,
+      })
+    );
     const deps = makeDeps({ runDeploy });
     const result = await run(deps, { exitCode: undefined });
     expect(result).toEqual({ kind: "deploy_succeeded" });
@@ -116,14 +112,17 @@ describe("orchestrateDeployAfterFcli", () => {
   });
 
   it("accepts a user-typed URL from the prompt when fcli did not emit one", async () => {
-    const watchPr = vi.fn(async (_opts: HotfixPrMergeWatchOptions) => ({ kind: "merged" as const, pull: fakePull }));
-    const runDeploy = vi.fn(async (): Promise<DeployRunResult> => ({
-      exitCode: 0,
-      ok: true,
+    const watchPr = vi.fn(async (_opts: HotfixPrMergeWatchOptions) => ({
+      kind: "merged" as const,
+      pull: fakePull,
     }));
-    const askForHotfixUrl = vi.fn(
-      async () => "https://github.com/acme/service/pull/99"
+    const runDeploy = vi.fn(
+      async (): Promise<DeployRunResult> => ({
+        exitCode: 0,
+        ok: true,
+      })
     );
+    const askForHotfixUrl = vi.fn(async () => "https://github.com/acme/service/pull/99");
     const deps = makeDeps({ watchPr, runDeploy, askForHotfixUrl });
     const result = await run(deps, { hotfixPrUrl: undefined });
     expect(result).toEqual({ kind: "deploy_succeeded" });
@@ -148,10 +147,12 @@ describe("orchestrateDeployAfterFcli", () => {
   });
 
   it("dispatches deploy with the resolved PR and workflows targets on merge", async () => {
-    const runDeploy = vi.fn(async (): Promise<DeployRunResult> => ({
-      exitCode: 0,
-      ok: true,
-    }));
+    const runDeploy = vi.fn(
+      async (): Promise<DeployRunResult> => ({
+        exitCode: 0,
+        ok: true,
+      })
+    );
     const deps = makeDeps({ runDeploy });
     const result = await run(deps);
     expect(result).toEqual({ kind: "deploy_succeeded" });
@@ -163,10 +164,12 @@ describe("orchestrateDeployAfterFcli", () => {
   });
 
   it("propagates non-zero deploy exit as deploy_failed", async () => {
-    const runDeploy = vi.fn(async (): Promise<DeployRunResult> => ({
-      exitCode: 7,
-      ok: false,
-    }));
+    const runDeploy = vi.fn(
+      async (): Promise<DeployRunResult> => ({
+        exitCode: 7,
+        ok: false,
+      })
+    );
     const deps = makeDeps({ runDeploy });
     const result = await run(deps);
     expect(result).toEqual({ kind: "deploy_failed", exitCode: 7 });
@@ -231,9 +234,7 @@ describe("orchestrateDeployAfterFcli", () => {
     const pendingWatch = new Promise<HotfixPrMergeWatchResult>((res) => {
       resolveWatch = res;
     });
-    const runDeploy = vi.fn(
-      async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
-    );
+    const runDeploy = vi.fn(async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true }));
     const deps = makeDeps({
       watchPr: vi.fn(() => pendingWatch),
       runDeploy,
@@ -268,10 +269,12 @@ describe("orchestrateDeployAfterFcli", () => {
         opts.onPhase?.({ kind: "merged", pull: fakePull });
         return { kind: "merged" as const, pull: fakePull };
       }),
-      runDeploy: vi.fn(async (): Promise<DeployRunResult> => ({
-        exitCode: 0,
-        ok: true,
-      })),
+      runDeploy: vi.fn(
+        async (): Promise<DeployRunResult> => ({
+          exitCode: 0,
+          ok: true,
+        })
+      ),
       hooks: {
         onResolvedPr,
         onWatchPhase,
@@ -284,13 +287,7 @@ describe("orchestrateDeployAfterFcli", () => {
     expect(onWatchPhase).toHaveBeenCalledTimes(2);
     expect(onDeployDispatchStart).toHaveBeenCalledOnce();
     expect(onDeployDispatchEnd).toHaveBeenCalledOnce();
-    expect(order).toEqual([
-      "resolved",
-      "phase",
-      "phase",
-      "deploy_start",
-      "deploy_end",
-    ]);
+    expect(order).toEqual(["resolved", "phase", "phase", "deploy_start", "deploy_end"]);
   });
 
   it("falls back to the prompt when fcli emitted a non-GitHub URL", async () => {
@@ -436,10 +433,7 @@ describe("orchestrateDeployAfterFcli", () => {
         fallbackRepo: { owner: "acme", repo: "service" },
         deps,
       });
-      expect(runDeploy.mock.calls.map((c) => c[0].env)).toEqual([
-        "pre",
-        "prod",
-      ]);
+      expect(runDeploy.mock.calls.map((c) => c[0].env)).toEqual(["pre", "prod"]);
     });
 
     it("fires onResolvedPr once per step, with the right PR each time", async () => {
@@ -450,9 +444,7 @@ describe("orchestrateDeployAfterFcli", () => {
       }));
       const deps = makeDeps({
         watchPr,
-        runDeploy: vi.fn(
-          async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
-        ),
+        runDeploy: vi.fn(async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })),
         hooks: { onResolvedPr },
       });
       await orchestrateDeployAfterFcli({
@@ -474,9 +466,7 @@ describe("orchestrateDeployAfterFcli", () => {
       }));
       const deps = makeDeps({
         watchPr,
-        runDeploy: vi.fn(
-          async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })
-        ),
+        runDeploy: vi.fn(async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })),
       });
       await orchestrateDeployAfterFcli({
         runResult: jsonRun({

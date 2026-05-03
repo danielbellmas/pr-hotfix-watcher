@@ -1,8 +1,5 @@
 import * as vscode from "vscode";
-import {
-  runInIntegratedTerminal,
-  runViaSpawn,
-} from "./commandRunner";
+import { runInIntegratedTerminal, runViaSpawn } from "./commandRunner";
 import {
   getHotfixRunMode,
   getHotfixTerminalAutoFirstConfirm,
@@ -34,17 +31,11 @@ function getOutputChannel(): vscode.OutputChannel {
 }
 
 /** Register so the channel is disposed on extension deactivation. */
-export function registerHotfixCliOutputChannel(
-  context: vscode.ExtensionContext
-): void {
+export function registerHotfixCliOutputChannel(context: vscode.ExtensionContext): void {
   context.subscriptions.push(getOutputChannel());
 }
 
-function appendRunHeader(
-  ch: vscode.OutputChannel,
-  prs: string,
-  command: string
-): void {
+function appendRunHeader(ch: vscode.OutputChannel, prs: string, command: string): void {
   ch.appendLine("");
   ch.appendLine(`── ${new Date().toISOString()} ──`);
   ch.appendLine(`Merged PRs: ${prs}`);
@@ -72,9 +63,7 @@ function notifyTerminalEnd(
       });
   } else if (exitCode === 0) {
     ch.appendLine("[hotfix-cli finished] exit 0");
-    void vscode.window.showInformationMessage(
-      `Hotfix CLI finished successfully for ${prs}.`
-    );
+    void vscode.window.showInformationMessage(`Hotfix CLI finished successfully for ${prs}.`);
   } else {
     ch.appendLine(`[hotfix-cli finished] exit ${exitCode}`);
     void vscode.window
@@ -146,17 +135,11 @@ async function runHotfixTransparent(
           subtitle: `${prs} — needs manual resolution in the worktree`,
           body: ev.line.slice(0, 240),
           severity: "error",
-          actions: [
-            { label: "Open worktree terminal" },
-            { label: "Open output" },
-          ],
+          actions: [{ label: "Open worktree terminal" }, { label: "Open output" }],
           log: (l) => ch.appendLine(l),
         }).then((picked) => {
           if (picked === "Open worktree terminal") {
-            void vscode.commands.executeCommand(
-              "fordefiHotfix.openWorktreeTerminal",
-              cwd
-            );
+            void vscode.commands.executeCommand("fordefiHotfix.openWorktreeTerminal", cwd);
           } else if (picked === "Open output") {
             ch.show(true);
           }
@@ -184,9 +167,7 @@ async function runHotfixTransparent(
           }
           return;
         }
-        ch.appendLine(
-          `[prompt] additional [y/n] prompt #${yesNoCount}: ${ev.line.trim()}`
-        );
+        ch.appendLine(`[prompt] additional [y/n] prompt #${yesNoCount}: ${ev.line.trim()}`);
         void notifyMilestone({
           title: "Hotfix CLI is waiting on a prompt",
           subtitle: `${prs} — open the output channel to see what it's asking`,
@@ -373,9 +354,7 @@ export async function runHotfixShellCommandAfterMerge(options: {
       } (running in ${cwd})`
     );
   } else {
-    ch.appendLine(
-      `[worktree] using ${cwd}${worktree?.created ? " (created)" : ""}`
-    );
+    ch.appendLine(`[worktree] using ${cwd}${worktree?.created ? " (created)" : ""}`);
   }
 
   const mode = getHotfixRunMode();
@@ -394,17 +373,14 @@ export async function runHotfixShellCommandAfterMerge(options: {
       : await runHotfixTransparent(command, cwd, prs, ch);
 
   const hotfixPrs = parseHotfixCliJson(raw.output);
-  const hotfixPrUrl =
-    hotfixPrs?.[0]?.htmlUrl ?? parseHotfixPrUrl(raw.output);
+  const hotfixPrUrl = hotfixPrs?.[0]?.htmlUrl ?? parseHotfixPrUrl(raw.output);
 
   if (mode !== "integratedTerminal" && raw.exitCode === 0) {
     // Transparent-mode success milestone — fired here so we can include the
     // resolved PR URL when -o json was honored, falling back to a generic
     // success line otherwise.
     if (hotfixPrs && hotfixPrs.length > 0) {
-      const list = hotfixPrs
-        .map((e) => `${e.env}:#${e.prNumber}`)
-        .join(", ");
+      const list = hotfixPrs.map((e) => `${e.env}:#${e.prNumber}`).join(", ");
       const firstUrl = hotfixPrs[0].htmlUrl;
       void notifyMilestone({
         title: "Hotfix PR(s) created",

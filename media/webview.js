@@ -153,7 +153,9 @@
     const parts = [];
     if (state.login) parts.push("<strong>@" + esc(state.login) + "</strong>");
     if (!state.login && !state.loadError && !state.listLoading) {
-      parts.push('Sign in: run <code>gh auth login</code>, or use <strong>"Hotfix: Set GitHub token"</strong>.');
+      parts.push(
+        'Sign in: run <code>gh auth login</code>, or use <strong>"Hotfix: Set GitHub token"</strong>.'
+      );
     }
     if (parts.length === 0 && state.listLoading) {
       meta.innerHTML = '<span class="skeleton skeleton-meta" aria-label="Loading"></span>';

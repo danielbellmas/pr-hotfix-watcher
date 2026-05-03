@@ -7,11 +7,7 @@ import type {
   HotfixPrMergeWatchResult,
 } from "./hotfixPrMergeWatch";
 import type { HotfixShellRunResult } from "./hotfixRun";
-import {
-  parseGithubPullUrl,
-  type HotfixPrEntry,
-  type ParsedPrUrl,
-} from "./hotfixRunHelpers";
+import { parseGithubPullUrl, type HotfixPrEntry, type ParsedPrUrl } from "./hotfixRunHelpers";
 
 /**
  * Pure orchestration of the post-fcli deploy flow. Separated from
@@ -31,9 +27,7 @@ export type DeployOrchestratorHooks = {
 
 export type DeployOrchestratorDeps = {
   resolveToken: () => Promise<string | undefined>;
-  watchPr: (
-    opts: HotfixPrMergeWatchOptions
-  ) => Promise<HotfixPrMergeWatchResult>;
+  watchPr: (opts: HotfixPrMergeWatchOptions) => Promise<HotfixPrMergeWatchResult>;
   runDeploy: (opts: {
     env: HotfixCliEnv;
     targets: DeployTargets;
@@ -43,10 +37,7 @@ export type DeployOrchestratorDeps = {
     sourcePrNumbers?: readonly number[];
   }) => Promise<DeployRunResult>;
   /** Prompt the user for a hotfix PR URL when fcli did not emit one. Return `undefined` on cancel. */
-  askForHotfixUrl: (fallback: {
-    owner: string;
-    repo: string;
-  }) => Promise<string | undefined>;
+  askForHotfixUrl: (fallback: { owner: string; repo: string }) => Promise<string | undefined>;
   pollIntervalMs: number;
   workflowsTargets: DeployTargets;
   /** Shared abort flag. `stopWatch` flips `aborted = true` to cancel the merge-watch loop. */
@@ -158,10 +149,7 @@ async function buildDeploySteps(args: {
   runResult: HotfixShellRunResult;
   requestedEnv: HotfixCliEnv;
   fallbackRepo: { owner: string; repo: string };
-  askForHotfixUrl: (fallback: {
-    owner: string;
-    repo: string;
-  }) => Promise<string | undefined>;
+  askForHotfixUrl: (fallback: { owner: string; repo: string }) => Promise<string | undefined>;
 }): Promise<DeployStep[] | undefined> {
   const { runResult, requestedEnv, fallbackRepo, askForHotfixUrl } = args;
 
@@ -170,20 +158,14 @@ async function buildDeploySteps(args: {
     return fromJson;
   }
 
-  const parsed = await resolveHotfixPr(
-    runResult.hotfixPrUrl,
-    fallbackRepo,
-    askForHotfixUrl
-  );
+  const parsed = await resolveHotfixPr(runResult.hotfixPrUrl, fallbackRepo, askForHotfixUrl);
   if (!parsed) {
     return undefined;
   }
   return [{ pr: parsed, env: requestedEnv }];
 }
 
-function stepsFromJsonPayload(
-  prs: HotfixPrEntry[] | undefined
-): DeployStep[] {
+function stepsFromJsonPayload(prs: HotfixPrEntry[] | undefined): DeployStep[] {
   if (!prs || prs.length === 0) {
     return [];
   }
@@ -272,9 +254,7 @@ export type DeployOutcomeDescription = {
   deployEnded: boolean;
 };
 
-export function describeDeployOutcome(
-  result: DeployOrchestratorResult
-): DeployOutcomeDescription {
+export function describeDeployOutcome(result: DeployOrchestratorResult): DeployOutcomeDescription {
   switch (result.kind) {
     case "fcli_failed":
       return {
@@ -333,10 +313,7 @@ export function describeDeployOutcome(
 async function resolveHotfixPr(
   parsedUrl: string | undefined,
   fallback: { owner: string; repo: string },
-  ask: (fallback: {
-    owner: string;
-    repo: string;
-  }) => Promise<string | undefined>
+  ask: (fallback: { owner: string; repo: string }) => Promise<string | undefined>
 ): Promise<ParsedPrUrl | undefined> {
   if (parsedUrl) {
     const parsed = parseGithubPullUrl(parsedUrl);

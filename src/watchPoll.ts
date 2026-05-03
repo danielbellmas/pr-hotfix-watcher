@@ -33,9 +33,7 @@ export function phaseFromSettledPulls(
     }
     pulls.push(phase.pull);
   }
-  const closedWithoutMerge = pulls.filter(
-    (p) => !p.merged_at && p.state === "closed"
-  );
+  const closedWithoutMerge = pulls.filter((p) => !p.merged_at && p.state === "closed");
   if (closedWithoutMerge.length > 0) {
     return {
       kind: "stop_closed",

@@ -1,13 +1,7 @@
 import * as vscode from "vscode";
-import {
-  runInIntegratedTerminal,
-  runViaSpawn,
-} from "./commandRunner";
+import { runInIntegratedTerminal, runViaSpawn } from "./commandRunner";
 import { getHotfixRunMode } from "./config";
-import {
-  buildDeployShellScript,
-  type DeployTargets,
-} from "./deployWorkflow";
+import { buildDeployShellScript, type DeployTargets } from "./deployWorkflow";
 import type { HotfixCliEnv } from "./hotfixCli";
 import { notifyMilestone } from "./notifyMilestone";
 import {
@@ -24,24 +18,17 @@ let deployOutputChannel: vscode.OutputChannel | undefined;
 
 function getDeployOutputChannel(): vscode.OutputChannel {
   if (!deployOutputChannel) {
-    deployOutputChannel =
-      vscode.window.createOutputChannel(DEPLOY_OUTPUT_TITLE);
+    deployOutputChannel = vscode.window.createOutputChannel(DEPLOY_OUTPUT_TITLE);
   }
   return deployOutputChannel;
 }
 
 /** Register so the deploy channel is disposed on extension deactivation. */
-export function registerHotfixDeployOutputChannel(
-  context: vscode.ExtensionContext
-): void {
+export function registerHotfixDeployOutputChannel(context: vscode.ExtensionContext): void {
   context.subscriptions.push(getDeployOutputChannel());
 }
 
-function appendDeployHeader(
-  ch: vscode.OutputChannel,
-  env: HotfixCliEnv,
-  script: string
-): void {
+function appendDeployHeader(ch: vscode.OutputChannel, env: HotfixCliEnv, script: string): void {
   ch.appendLine("");
   ch.appendLine(`── ${new Date().toISOString()} ──`);
   ch.appendLine(`Deploy env: ${env}`);
@@ -218,9 +205,7 @@ async function runDeployIntegratedTerminal(
   ch.appendLine("");
   if (result.exitCode === 0) {
     ch.appendLine(`[deploy finished] exit 0`);
-    void vscode.window.showInformationMessage(
-      `Hotfix deploy finished successfully.`
-    );
+    void vscode.window.showInformationMessage(`Hotfix deploy finished successfully.`);
     pingDeployFinished(ch, { kind: "success" }, env, sourcePrNumbers);
   } else if (result.exitCode === undefined) {
     ch.appendLine(`[deploy finished] exit code unknown`);
@@ -233,12 +218,7 @@ async function runDeployIntegratedTerminal(
     void vscode.window.showErrorMessage(
       `Hotfix deploy failed (exit ${result.exitCode}). See terminal "${DEPLOY_TERMINAL_NAME}".`
     );
-    pingDeployFinished(
-      ch,
-      { kind: "failure", exitCode: result.exitCode },
-      env,
-      sourcePrNumbers
-    );
+    pingDeployFinished(ch, { kind: "failure", exitCode: result.exitCode }, env, sourcePrNumbers);
   }
   return { exitCode: result.exitCode, ok: result.exitCode === 0 };
 }

@@ -2,11 +2,7 @@ import * as cp from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-export type WorktreeFallbackReason =
-  | "empty-root"
-  | "missing-git"
-  | "not-a-repo"
-  | "add-failed";
+export type WorktreeFallbackReason = "empty-root" | "missing-git" | "not-a-repo" | "add-failed";
 
 export type EnsureHotfixWorktreeResult = {
   /** Effective working directory for the hotfix command. */
@@ -24,11 +20,7 @@ export type EnsureHotfixWorktreeResult = {
  * touching the real git or filesystem.
  */
 export type WorktreeDeps = {
-  exec: (
-    file: string,
-    args: string[],
-    opts?: { cwd?: string; timeoutMs?: number }
-  ) => ExecResult;
+  exec: (file: string, args: string[], opts?: { cwd?: string; timeoutMs?: number }) => ExecResult;
   existsSync: (p: string) => boolean;
   mkdirSync: (p: string, opts?: { recursive?: boolean }) => void;
   log?: (line: string) => void;
@@ -66,9 +58,7 @@ export const HOTFIX_WORKTREE_SUFFIX = "-hotfix-worktree";
  */
 export const HOTFIX_WORKTREE_BRANCH = "hotfix-worktree";
 
-export function createDefaultWorktreeDeps(
-  log?: (line: string) => void
-): WorktreeDeps {
+export function createDefaultWorktreeDeps(log?: (line: string) => void): WorktreeDeps {
   return {
     exec: (file, args, opts) => {
       try {
@@ -94,10 +84,7 @@ export function createDefaultWorktreeDeps(
 }
 
 /** Resolve the default branch name (without the `origin/` prefix). */
-export function resolveDefaultBranch(
-  repoRoot: string,
-  deps: WorktreeDeps
-): string {
+export function resolveDefaultBranch(repoRoot: string, deps: WorktreeDeps): string {
   const res = deps.exec(
     "git",
     ["-C", repoRoot, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
@@ -136,11 +123,9 @@ export function applyWorktreeHttpsRewrite(
   ghPath: string,
   deps: WorktreeDeps
 ): void {
-  const enable = deps.exec(
-    "git",
-    ["-C", repoRoot, "config", "extensions.worktreeConfig", "true"],
-    { cwd: repoRoot }
-  );
+  const enable = deps.exec("git", ["-C", repoRoot, "config", "extensions.worktreeConfig", "true"], {
+    cwd: repoRoot,
+  });
   if (!enable.ok) {
     deps.log?.(
       `[worktree] https-rewrite skipped: enable extensions.worktreeConfig failed — ${enable.error.message.trim()}`
@@ -230,11 +215,9 @@ export function applyWorktreeHttpsRewrite(
 }
 
 function isInsideWorkTree(wtPath: string, deps: WorktreeDeps): boolean {
-  const res = deps.exec(
-    "git",
-    ["-C", wtPath, "rev-parse", "--is-inside-work-tree"],
-    { cwd: wtPath }
-  );
+  const res = deps.exec("git", ["-C", wtPath, "rev-parse", "--is-inside-work-tree"], {
+    cwd: wtPath,
+  });
   if (!res.ok) {
     return false;
   }
@@ -242,11 +225,7 @@ function isInsideWorkTree(wtPath: string, deps: WorktreeDeps): boolean {
 }
 
 function isGitRepo(repoRoot: string, deps: WorktreeDeps): boolean {
-  const res = deps.exec(
-    "git",
-    ["-C", repoRoot, "rev-parse", "--git-dir"],
-    { cwd: repoRoot }
-  );
+  const res = deps.exec("git", ["-C", repoRoot, "rev-parse", "--git-dir"], { cwd: repoRoot });
   return res.ok;
 }
 
@@ -307,21 +286,11 @@ export async function ensureHotfixWorktree(
 
   const probe = deps.exec("git", ["--version"]);
   if (!probe.ok && isGitMissing(probe.error)) {
-    return buildFallback(
-      repoRoot,
-      "missing-git",
-      "`git` executable not found on PATH",
-      deps
-    );
+    return buildFallback(repoRoot, "missing-git", "`git` executable not found on PATH", deps);
   }
 
   if (!isGitRepo(repoRoot, deps)) {
-    return buildFallback(
-      repoRoot,
-      "not-a-repo",
-      `${repoRoot} is not a git repository`,
-      deps
-    );
+    return buildFallback(repoRoot, "not-a-repo", `${repoRoot} is not a git repository`, deps);
   }
 
   const wtPath = computeWorktreePath(repoRoot);
@@ -337,27 +306,13 @@ export async function ensureHotfixWorktree(
     deps.mkdirSync(parentDir, { recursive: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return buildFallback(
-      repoRoot,
-      "add-failed",
-      `mkdir ${parentDir}: ${msg}`,
-      deps
-    );
+    return buildFallback(repoRoot, "add-failed", `mkdir ${parentDir}: ${msg}`, deps);
   }
 
   const branch = resolveDefaultBranch(repoRoot, deps);
   const addRes = deps.exec(
     "git",
-    [
-      "-C",
-      repoRoot,
-      "worktree",
-      "add",
-      "-B",
-      HOTFIX_WORKTREE_BRANCH,
-      wtPath,
-      `origin/${branch}`,
-    ],
+    ["-C", repoRoot, "worktree", "add", "-B", HOTFIX_WORKTREE_BRANCH, wtPath, `origin/${branch}`],
     { cwd: repoRoot, timeoutMs: 120_000 }
   );
 
@@ -370,9 +325,7 @@ export async function ensureHotfixWorktree(
     );
   }
 
-  deps.log?.(
-    `[worktree] created: ${wtPath} (branch ${HOTFIX_WORKTREE_BRANCH} @ origin/${branch})`
-  );
+  deps.log?.(`[worktree] created: ${wtPath} (branch ${HOTFIX_WORKTREE_BRANCH} @ origin/${branch})`);
   applyWorktreeHttpsRewrite(repoRoot, wtPath, options?.ghPath ?? "", deps);
   runPostCreateCommand(wtPath, options?.postCreateCommand, deps);
   return { path: wtPath, created: true };
@@ -401,9 +354,7 @@ function runPostCreateCommand(
     timeoutMs: POST_CREATE_TIMEOUT_MS,
   });
   if (!res.ok) {
-    deps.log?.(
-      `[worktree] post-create failed (continuing): ${res.error.message.trim()}`
-    );
+    deps.log?.(`[worktree] post-create failed (continuing): ${res.error.message.trim()}`);
     return;
   }
   deps.log?.(`[worktree] post-create completed: "${cmd}"`);

@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GitHubError, type GitHubPull } from "../src/githubClient";
 import { phaseFromSettledPulls } from "../src/watchPoll";
 
-function mkPull(
-  over: Partial<GitHubPull> & Pick<GitHubPull, "number">
-): GitHubPull {
+function mkPull(over: Partial<GitHubPull> & Pick<GitHubPull, "number">): GitHubPull {
   return {
     title: "t",
     state: "open",
@@ -100,9 +98,7 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
 
   it("stops when a PR is closed without merge", () => {
     const target = [5] as const;
-    const settled = [
-      fulfilled(mkPull({ number: 5, merged_at: null, state: "closed" })),
-    ];
+    const settled = [fulfilled(mkPull({ number: 5, merged_at: null, state: "closed" }))];
     expect(phaseFromSettledPulls(target, settled)).toEqual({
       kind: "stop_closed",
       prNumbers: [5],
@@ -122,10 +118,7 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
   });
 
   it("returns poll_error when settled length mismatches targets", () => {
-    const phase = phaseFromSettledPulls(
-      [1, 2],
-      [fulfilled(mkPull({ number: 1 }))]
-    );
+    const phase = phaseFromSettledPulls([1, 2], [fulfilled(mkPull({ number: 1 }))]);
     expect(phase).toMatchObject({
       kind: "poll_error",
       message: expect.stringContaining("mismatch"),
@@ -154,9 +147,7 @@ describe("phaseFromSettledPulls (watch until merge)", () => {
 
   it("all_merged when merged_at is set even if state is still open (API oddity)", () => {
     const settled = [
-      fulfilled(
-        mkPull({ number: 1, merged_at: "2024-01-01T00:00:00Z", state: "open" })
-      ),
+      fulfilled(mkPull({ number: 1, merged_at: "2024-01-01T00:00:00Z", state: "open" })),
     ];
     expect(phaseFromSettledPulls([1], settled)).toEqual({ kind: "all_merged" });
   });

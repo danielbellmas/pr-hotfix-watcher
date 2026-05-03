@@ -1,8 +1,4 @@
-import {
-  getPullRequest,
-  GitHubError,
-  type GitHubPull,
-} from "./githubClient";
+import { getPullRequest, GitHubError, type GitHubPull } from "./githubClient";
 
 /**
  * Outcome of one hotfix-PR merge-watch poll.
@@ -52,12 +48,7 @@ export type HotfixPrMergeWatchOptions = {
   /** Signal for external cancel (e.g. user clicks stop watching). */
   signal?: { aborted: boolean };
   /** Injected fetch for tests — defaults to {@link getPullRequest}. */
-  fetch?: (
-    token: string,
-    owner: string,
-    repo: string,
-    prNumber: number
-  ) => Promise<GitHubPull>;
+  fetch?: (token: string, owner: string, repo: string, prNumber: number) => Promise<GitHubPull>;
   /** Injected sleep for tests. */
   sleep?: (ms: number) => Promise<void>;
 };
@@ -69,8 +60,7 @@ export type HotfixPrMergeWatchResult =
   | { kind: "aborted" }
   | { kind: "error"; message: string };
 
-const defaultSleep = (ms: number): Promise<void> =>
-  new Promise((res) => setTimeout(res, ms));
+const defaultSleep = (ms: number): Promise<void> => new Promise((res) => setTimeout(res, ms));
 
 /**
  * Polls the hotfix PR until it is merged, closed without merging, not found,
@@ -91,9 +81,7 @@ export async function watchHotfixPrMerge(
     sleep = defaultSleep,
   } = options;
   while (!signal?.aborted) {
-    const settled = await Promise.allSettled([
-      fetch(token, owner, repo, prNumber),
-    ]);
+    const settled = await Promise.allSettled([fetch(token, owner, repo, prNumber)]);
     const phase = phaseFromHotfixSettled(settled[0]);
     onPhase?.(phase);
     if (phase.kind === "merged") {

@@ -1,11 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("vscode", async () => {
   const mod = await import("./_util/fakeVscode");
@@ -19,10 +12,7 @@ vi.mock("node:child_process", () => ({
       _file: string,
       _args: string[],
       _opts: unknown,
-      cb: (
-        err: Error | null,
-        result: { stdout: string; stderr: string }
-      ) => void
+      cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
     ) => {
       cb(null, { stdout: "fake-gh-token\n", stderr: "" });
     }
@@ -145,10 +135,7 @@ describe("PrListController integration", () => {
         _file: string,
         _args: string[],
         _opts: unknown,
-        cb: (
-          err: Error | null,
-          result: { stdout: string; stderr: string }
-        ) => void
+        cb: (err: Error | null, result: { stdout: string; stderr: string }) => void
       ) => {
         cb(null, { stdout: "fake-gh-token\n", stderr: "" });
       }
@@ -295,9 +282,7 @@ describe("PrListController integration", () => {
       .warn.mock.calls.slice(warnCallsBefore)
       .map((c) => String(c[0]));
     // The warning explains the dispatched GitHub run is not auto-cancelled.
-    expect(
-      newWarnCalls.some((m) => /Stop pressed during deploy/i.test(m))
-    ).toBe(true);
+    expect(newWarnCalls.some((m) => /Stop pressed during deploy/i.test(m))).toBe(true);
 
     // Drain the orchestrator's still-pending await so the test exits cleanly.
     deploy.resolve({ exitCode: 0, ok: true });
@@ -447,11 +432,7 @@ describe("PrListController integration", () => {
     provider.setCheckboxState(500, true);
     provider.startWatch();
 
-    await Promise.all([
-      provider.pollOnce(),
-      provider.pollOnce(),
-      provider.pollOnce(),
-    ]);
+    await Promise.all([provider.pollOnce(), provider.pollOnce(), provider.pollOnce()]);
 
     await waitFor(() => mockedRunFcli.mock.calls.length >= 1);
     expect(mockedRunFcli).toHaveBeenCalledTimes(1);
@@ -683,9 +664,7 @@ describe("PrListController integration", () => {
     provider.startWatch();
 
     await waitFor(
-      () =>
-        (global.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls
-          .length >= 4,
+      () => (global.fetch as unknown as { mock: { calls: unknown[] } }).mock.calls.length >= 4,
       { label: ">=4 poll fetches" }
     );
 

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ensureJsonOutputFlag,
-  expandHotfixCommandTemplate,
-} from "../src/hotfixCommandTemplate";
+import { ensureJsonOutputFlag, expandHotfixCommandTemplate } from "../src/hotfixCommandTemplate";
 
 describe("expandHotfixCommandTemplate", () => {
   const base = {
@@ -31,13 +28,10 @@ describe("expandHotfixCommandTemplate", () => {
   });
 
   it("leaves unknown placeholders untouched", () => {
-    const out = expandHotfixCommandTemplate(
-      "{prNumbers} {notAPlaceholder} {repoRoot}",
-      {
-        ...base,
-        prNumbers: [9],
-      }
-    );
+    const out = expandHotfixCommandTemplate("{prNumbers} {notAPlaceholder} {repoRoot}", {
+      ...base,
+      prNumbers: [9],
+    });
     expect(out).toBe("9 {notAPlaceholder} /tmp/repo");
   });
 
@@ -65,21 +59,15 @@ describe("expandHotfixCommandTemplate", () => {
       "./fcli workflows hotfix create-pull-request {prNumbers} -o json",
       base
     );
-    expect(out).toBe(
-      "./fcli workflows hotfix create-pull-request 1 3 -o json"
-    );
+    expect(out).toBe("./fcli workflows hotfix create-pull-request 1 3 -o json");
   });
 });
 
 describe("ensureJsonOutputFlag", () => {
   it("appends -o json to an fcli hotfix create-pull-request invocation", () => {
     expect(
-      ensureJsonOutputFlag(
-        "./fcli workflows hotfix create-pull-request 12 34 --env pre"
-      )
-    ).toBe(
-      "./fcli workflows hotfix create-pull-request 12 34 --env pre -o json"
-    );
+      ensureJsonOutputFlag("./fcli workflows hotfix create-pull-request 12 34 --env pre")
+    ).toBe("./fcli workflows hotfix create-pull-request 12 34 --env pre -o json");
   });
 
   it("is idempotent when -o json or --output json already present", () => {
@@ -103,8 +91,6 @@ describe("ensureJsonOutputFlag", () => {
 
   it("leaves unrelated commands alone", () => {
     expect(ensureJsonOutputFlag("echo hello")).toBe("echo hello");
-    expect(ensureJsonOutputFlag("./fcli something else 1 2")).toBe(
-      "./fcli something else 1 2"
-    );
+    expect(ensureJsonOutputFlag("./fcli something else 1 2")).toBe("./fcli something else 1 2");
   });
 });

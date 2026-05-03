@@ -1,0 +1,6 @@
+out/
+out-test/
+node_modules/
+*.vsix
+package-lock.json
+test/e2e/out/

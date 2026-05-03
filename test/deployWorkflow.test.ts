@@ -33,9 +33,7 @@ describe("buildGhWorkflowRunCommand", () => {
         workflow: "pre-hotfix.yml",
         ref: "main",
       })
-    ).toBe(
-      "gh workflow run 'pre-hotfix.yml' --repo 'arnac-io/workflows' --ref 'main'"
-    );
+    ).toBe("gh workflow run 'pre-hotfix.yml' --repo 'arnac-io/workflows' --ref 'main'");
   });
 });
 

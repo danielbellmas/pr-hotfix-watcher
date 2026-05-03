@@ -79,10 +79,7 @@ export function buildGhWaitForNewAndCompleteRun(params: {
   const { repoSlug, workflow, prevIdVar, runIdVar } = params;
   const pollSeconds = Math.max(2, params.pollSeconds ?? 10);
   const newRunTimeout = Math.max(30, params.newRunTimeoutSeconds ?? 300);
-  const completionTimeout = Math.max(
-    60,
-    params.completionTimeoutSeconds ?? 60 * 60
-  );
+  const completionTimeout = Math.max(60, params.completionTimeoutSeconds ?? 60 * 60);
   const slug = shellQuote(repoSlug);
   const wf = shellQuote(workflow);
   return [
@@ -127,10 +124,7 @@ export function buildGhWaitForNewAndCompleteRun(params: {
  * Throws on unknown env so a malformed state never silently picks the wrong
  * environment.
  */
-export function buildDeployShellScript(
-  env: HotfixCliEnv,
-  targets: DeployTargets
-): string {
+export function buildDeployShellScript(env: HotfixCliEnv, targets: DeployTargets): string {
   const { repoSlug, preWorkflow, prodWorkflow, ref } = targets;
   const preRun = buildGhWorkflowRunCommand({
     repoSlug,
@@ -160,20 +154,11 @@ export function buildDeployShellScript(
         prevIdVar: "__hf_prev",
         runIdVar: "__hf_id",
       });
-      return [
-        "set -e",
-        snapshot,
-        preRun,
-        wait,
-        prodRun,
-        "",
-      ].join("\n");
+      return ["set -e", snapshot, preRun, wait, prodRun, ""].join("\n");
     }
     default: {
       const exhaustive: never = env;
-      throw new Error(
-        `buildDeployShellScript: unsupported env ${String(exhaustive)}`
-      );
+      throw new Error(`buildDeployShellScript: unsupported env ${String(exhaustive)}`);
     }
   }
 }
