@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { type HotfixCliEnv } from "../src/hotfixCli";
 import {
   buildDeployShellScript,
   buildGhRunListSnapshotLatestId,
@@ -117,10 +118,9 @@ describe("buildDeployShellScript", () => {
   });
 
   it("throws on unknown env (exhaustive guard)", () => {
-    expect(() =>
-      // @ts-expect-error malformed persisted env
-      buildDeployShellScript("staging", targets)
-    ).toThrow(/unsupported env/);
+    expect(() => buildDeployShellScript("staging" as unknown as HotfixCliEnv, targets)).toThrow(
+      /unsupported env/
+    );
   });
 
   it("both: snapshots pre id BEFORE dispatch, waits for the new run, then prod", () => {

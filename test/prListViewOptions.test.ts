@@ -3,6 +3,7 @@ import {
   applyPrViewFilterSort,
   matchesPrStatusFilter,
   normalizePrListViewOptions,
+  type PrListViewOptions,
 } from "../src/prListViewOptions";
 
 const row = (
@@ -50,12 +51,16 @@ describe("normalizePrListViewOptions", () => {
       sortMode: "created" as const,
     };
     expect(
-      // @ts-expect-error persisted garbage
-      normalizePrListViewOptions({ statusFilter: "nope" }, altDefaults)
+      normalizePrListViewOptions(
+        { statusFilter: "nope" } as unknown as Partial<PrListViewOptions>,
+        altDefaults
+      )
     ).toEqual(altDefaults);
     expect(
-      // @ts-expect-error persisted garbage
-      normalizePrListViewOptions({ sortMode: "newest" }, altDefaults)
+      normalizePrListViewOptions(
+        { sortMode: "newest" } as unknown as Partial<PrListViewOptions>,
+        altDefaults
+      )
     ).toEqual(altDefaults);
   });
 });
