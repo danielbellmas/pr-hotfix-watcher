@@ -83,6 +83,7 @@ export type HotfixPrViewState = {
 const SELECTED_PRS_KEY = "fordefiHotfix.selectedPrs";
 
 export class PrListController {
+  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
   private _onDidChangeTreeData = new vscode.EventEmitter<PrRow | undefined | void>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 

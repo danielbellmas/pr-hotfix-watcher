@@ -381,7 +381,7 @@ export async function runHotfixShellCommandAfterMerge(options: {
     // success line otherwise.
     if (hotfixPrs && hotfixPrs.length > 0) {
       const list = hotfixPrs.map((e) => `${e.env}:#${e.prNumber}`).join(", ");
-      const firstUrl = hotfixPrs[0].htmlUrl;
+      const firstUrl = hotfixPrs[0]?.htmlUrl;
       void notifyMilestone({
         title: "Hotfix PR(s) created",
         subtitle: list,

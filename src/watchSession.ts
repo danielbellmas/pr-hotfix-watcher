@@ -276,7 +276,8 @@ export class WatchSession {
           this.watchEntries = settled.map((r, i) => {
             const p = r.value;
             return {
-              number: this.watchTarget[i],
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop-bounded index
+              number: this.watchTarget[i]!,
               title: p.title,
               state: p.state,
               merged: Boolean(p.merged_at),

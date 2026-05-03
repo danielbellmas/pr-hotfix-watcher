@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "out-test",
-    "noEmit": true
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "out", "out-test", "test/e2e/**"]

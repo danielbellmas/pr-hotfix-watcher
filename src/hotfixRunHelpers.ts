@@ -76,7 +76,8 @@ export function parseGithubPullUrl(url: string): ParsedPrUrl | undefined {
   if (!Number.isInteger(prNumber) || prNumber <= 0) {
     return undefined;
   }
-  return { owner: m[1], repo: m[2], prNumber };
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- regex capture groups guaranteed by match
+  return { owner: m[1]!, repo: m[2]!, prNumber };
 }
 
 /**
@@ -152,7 +153,8 @@ export function parseHotfixCliJson(output: string): HotfixPrEntry[] | undefined 
   const cleaned = stripAnsi(output).replace(/\r\n/g, "\n");
   const lines = cleaned.split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop-bounded index
+    const line = lines[i]!.trim();
     if (!line.startsWith("{") || !line.endsWith("}")) {
       continue;
     }

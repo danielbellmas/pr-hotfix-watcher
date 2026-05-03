@@ -53,7 +53,7 @@ export function ensureJsonOutputFlag(command: string): string {
   if (!m) {
     return command;
   }
-  const invocation = m[1];
+  const invocation = m[1] ?? "";
   if (HAS_OUTPUT_JSON_FLAG.test(invocation)) {
     return command;
   }

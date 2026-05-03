@@ -7,7 +7,7 @@ export default tseslint.config(
     ignores: ["out/**", "out-test/**", "node_modules/**", "test/e2e/out/**", "*.vsix", "media/**"],
   },
   js.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.strict,
   prettier,
   {
     languageOptions: {
@@ -39,6 +39,7 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-expressions": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   }
 );

@@ -24,9 +24,14 @@ export function phaseFromSettledPulls(
   // index, not a folded-over later PR.
   const pulls: GitHubPull[] = [];
   for (let i = 0; i < settled.length; i++) {
-    const phase = phaseFromHotfixSettled(settled[i]);
+    const result = settled[i];
+    if (!result) {
+      return { kind: "poll_error", message: `watch poll: missing result at index ${i}` };
+    }
+    const phase = phaseFromHotfixSettled(result);
     if (phase.kind === "not_found") {
-      return { kind: "stop_404", prNumber: watchTarget[i] };
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- loop-bounded index
+      return { kind: "stop_404", prNumber: watchTarget[i]! };
     }
     if (phase.kind === "error") {
       return { kind: "poll_error", message: phase.message };

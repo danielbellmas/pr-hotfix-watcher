@@ -60,7 +60,7 @@ export function makeFetchStub(script: FetchScript): ReturnType<typeof vi.fn> & t
         headers: { "Content-Type": "application/json" },
       });
     }
-    const next = queue.length > 1 ? queue.shift()! : queue[0];
+    const next = (queue.length > 1 ? queue.shift() : queue[0])!;
     if (next === "network_error") {
       throw new TypeError("network error");
     }
