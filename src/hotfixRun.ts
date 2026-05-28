@@ -103,7 +103,7 @@ async function runHotfixTransparent(
   let yesNoCount = 0;
   const skipYubikey = isYubikeyAgentRunning();
   ch.appendLine(
-    `[transparent] starting; yubikey-agent ${
+    `[transparent] starting via ${process.env.SHELL || "/bin/zsh"} -lc; yubikey-agent ${
       skipYubikey ? "detected — touch notifications suppressed" : "not detected"
     }`
   );
@@ -193,7 +193,7 @@ async function runHotfixTransparent(
   const result = await runViaSpawn({
     command,
     cwd,
-    shell: true,
+    loginShell: true,
     captureOutput: true,
     log: (chunk) => ch.append(chunk),
     onChunk: (chunk) => detector.push(chunk),

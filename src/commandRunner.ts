@@ -205,6 +205,8 @@ export type SpawnRunOptions = {
   command: string;
   cwd: string;
   shell?: boolean | string;
+  /** Run `$SHELL -lc command` so direnv/nix/PATH match an integrated terminal. */
+  loginShell?: boolean;
   log: (chunk: string) => void;
   captureOutput?: boolean;
   /** Optional secondary chunk stream — same data as `log`, useful when one
@@ -230,7 +232,16 @@ export type SpawnRunResult = {
 
 /** Never rejects — spawn errors surface as `{ spawnError }`. */
 export async function runViaSpawn(options: SpawnRunOptions): Promise<SpawnRunResult> {
-  const { command, cwd, shell = true, log, captureOutput = false, onChunk, onChild } = options;
+  const {
+    command,
+    cwd,
+    shell = true,
+    loginShell = false,
+    log,
+    captureOutput = false,
+    onChunk,
+    onChild,
+  } = options;
 
   return new Promise<SpawnRunResult>((resolve) => {
     let captured = "";
@@ -238,12 +249,18 @@ export async function runViaSpawn(options: SpawnRunOptions): Promise<SpawnRunRes
     let resolvedSignal: NodeJS.Signals | null = null;
     let spawnError: Error | undefined;
 
-    const child = cp.spawn(command, {
-      shell,
-      cwd,
-      env: process.env,
-      windowsHide: true,
-    });
+    const child = loginShell
+      ? cp.spawn(process.env.SHELL || "/bin/zsh", ["-lc", command], {
+          cwd,
+          env: process.env,
+          windowsHide: true,
+        })
+      : cp.spawn(command, {
+          shell,
+          cwd,
+          env: process.env,
+          windowsHide: true,
+        });
 
     if (onChild) {
       try {

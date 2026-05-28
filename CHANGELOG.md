@@ -2,6 +2,13 @@
 
 All notable changes to the Fordefi Hotfix Watcher extension will be documented in this file.
 
+## [0.1.5] - 2026-05-28
+
+### Fixed
+
+- Run transparent-mode fcli through `$SHELL -lc` so direnv/nix/PATH match debug
+  terminal (fixes silent fcli failures in transparent mode)
+
 ## [0.1.4] - 2026-05-28
 
 ### Fixed
