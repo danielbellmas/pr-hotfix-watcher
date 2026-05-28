@@ -2,6 +2,13 @@
 
 All notable changes to the Fordefi Hotfix Watcher extension will be documented in this file.
 
+## [0.1.2] - 2026-05-28
+
+### Fixed
+
+- Stop auto-injecting `-o json` into fcli commands (breaks older fcli builds)
+- Lower `engines.vscode` to `^1.94.0` so the VSIX installs on current Cursor builds
+
 ## [0.1.0] - 2026-05-03
 
 ### Added
