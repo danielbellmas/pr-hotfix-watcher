@@ -1,12 +1,14 @@
 import * as vscode from "vscode";
 import { runInIntegratedTerminal, runViaSpawn } from "./commandRunner";
 import {
+  getFcliJsonOutput,
   getHotfixRunMode,
   getHotfixTerminalAutoFirstConfirm,
   getHotfixTerminalAutoFirstConfirmDelayMs,
   getHotfixTerminalAutoFirstConfirmText,
   getHotfixTerminalName,
 } from "./config";
+import { stripFcliJsonOutputFlag } from "./hotfixCommandTemplate";
 import {
   formatPrLabels,
   type HotfixPrEntry,
@@ -337,16 +339,27 @@ export type WorktreeRunContext = {
  * dual-fired notifications. The user can opt into the visible
  * `integratedTerminal` debug flow via `fordefiHotfix.debugTerminal`.
  */
+function sanitizeHotfixShellCommand(command: string): string {
+  if (getFcliJsonOutput()) {
+    return command;
+  }
+  return stripFcliJsonOutputFlag(command);
+}
+
 export async function runHotfixShellCommandAfterMerge(options: {
   command: string;
   cwd: string;
   prNumbers: readonly number[];
   worktree?: WorktreeRunContext;
 }): Promise<HotfixShellRunResult> {
-  const { command, cwd, prNumbers, worktree } = options;
+  const { cwd, prNumbers, worktree } = options;
+  const command = sanitizeHotfixShellCommand(options.command);
   const prs = formatPrLabels(prNumbers);
   const ch = getOutputChannel();
   appendRunHeader(ch, prs, command);
+  if (command !== options.command) {
+    ch.appendLine("[hotfix] stripped -o json (fordefiHotfix.fcliJsonOutput is off)");
+  }
   if (worktree?.fallback) {
     ch.appendLine(
       `[worktree] fallback: ${worktree.fallback}${

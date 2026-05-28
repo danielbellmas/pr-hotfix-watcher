@@ -2,6 +2,13 @@
 
 All notable changes to the Fordefi Hotfix Watcher extension will be documented in this file.
 
+## [0.1.4] - 2026-05-28
+
+### Fixed
+
+- Strip `-o json` at shell execution time so stale extension hosts and old
+  auto-inject paths cannot pass the flag through to fcli
+
 ## [0.1.3] - 2026-05-28
 
 ### Fixed
