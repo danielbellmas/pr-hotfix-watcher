@@ -96,9 +96,10 @@ is written to stdout describing every hotfix PR that was created:
 ```
 
 The watcher prefers this payload when it is present and falls back to the
-legacy `HOTFIX_PR_URL=…` line (then to a manual prompt) otherwise. Adding
-`-o json` to the **commandTemplate** is the recommended setup, and is required
-for the pre→prod sequencing described below:
+legacy `HOTFIX_PR_URL=…` line (then to a manual prompt) otherwise. Add
+`-o json` to your **commandTemplate** only when your `fcli` build supports it
+(`./fcli workflows hotfix create-pull-request --help`). Required for the
+pre→prod sequencing described below:
 
 ```text
 cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} --env pre --env prod -o json

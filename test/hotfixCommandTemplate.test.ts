@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ensureJsonOutputFlag, expandHotfixCommandTemplate } from "../src/hotfixCommandTemplate";
+import { expandHotfixCommandTemplate } from "../src/hotfixCommandTemplate";
 
 describe("expandHotfixCommandTemplate", () => {
   const base = {
@@ -44,53 +44,19 @@ describe("expandHotfixCommandTemplate", () => {
     expect(out).toBe("x  y  z");
   });
 
-  it("auto-injects -o json into an fcli hotfix create-pull-request invocation", () => {
+  it("does not mutate fcli flags beyond placeholder expansion", () => {
     const out = expandHotfixCommandTemplate(
       "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
       base
     );
-    expect(out).toBe(
-      "cd /tmp/repo && ./fcli workflows hotfix create-pull-request 1 3 --env pre -o json"
-    );
+    expect(out).toBe("cd /tmp/repo && ./fcli workflows hotfix create-pull-request 1 3 --env pre");
   });
 
-  it("does not double-inject -o json when the user already specified it", () => {
+  it("preserves -o json when the user put it in the template", () => {
     const out = expandHotfixCommandTemplate(
       "./fcli workflows hotfix create-pull-request {prNumbers} -o json",
       base
     );
     expect(out).toBe("./fcli workflows hotfix create-pull-request 1 3 -o json");
-  });
-});
-
-describe("ensureJsonOutputFlag", () => {
-  it("appends -o json to an fcli hotfix create-pull-request invocation", () => {
-    expect(
-      ensureJsonOutputFlag("./fcli workflows hotfix create-pull-request 12 34 --env pre")
-    ).toBe("./fcli workflows hotfix create-pull-request 12 34 --env pre -o json");
-  });
-
-  it("is idempotent when -o json or --output json already present", () => {
-    const a = "./fcli workflows hotfix create-pull-request 1 -o json";
-    expect(ensureJsonOutputFlag(a)).toBe(a);
-    const b = "./fcli workflows hotfix create-pull-request 1 --output json";
-    expect(ensureJsonOutputFlag(b)).toBe(b);
-    const c = "./fcli workflows hotfix create-pull-request 1 --output=json";
-    expect(ensureJsonOutputFlag(c)).toBe(c);
-  });
-
-  it("preserves trailing shell-chain operators (&&, ;) by injecting before them", () => {
-    expect(
-      ensureJsonOutputFlag(
-        "cd /repo && ./fcli workflows hotfix create-pull-request 1 --env pre && echo done"
-      )
-    ).toBe(
-      "cd /repo && ./fcli workflows hotfix create-pull-request 1 --env pre -o json && echo done"
-    );
-  });
-
-  it("leaves unrelated commands alone", () => {
-    expect(ensureJsonOutputFlag("echo hello")).toBe("echo hello");
-    expect(ensureJsonOutputFlag("./fcli something else 1 2")).toBe("./fcli something else 1 2");
   });
 });
