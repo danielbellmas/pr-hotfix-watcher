@@ -163,6 +163,15 @@ export function getHotfixPrPollIntervalMs(): number {
   return getPollIntervalMs();
 }
 
+/** Max wait for GitHub to show a new [Hotfix] PR when fcli output has no URL. */
+export function getHotfixPrDiscoveryTimeoutMs(): number {
+  const sec = vscode.workspace
+    .getConfiguration("fordefiHotfix")
+    .get<number>("hotfixPrDiscoveryTimeoutMinutes", 45);
+  const minutes = Number.isFinite(sec) && sec > 0 ? sec : 45;
+  return minutes * 60 * 1000;
+}
+
 export function getFcliJsonOutput(): boolean {
   return Boolean(
     vscode.workspace.getConfiguration("fordefiHotfix").get<boolean>("fcliJsonOutput", false)

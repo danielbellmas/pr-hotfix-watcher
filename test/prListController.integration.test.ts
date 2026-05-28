@@ -44,6 +44,7 @@ vi.mock("../src/config", async (importOriginal) => {
     ...real,
     getPollIntervalMs: () => 20,
     getHotfixPrPollIntervalMs: () => 20,
+    getHotfixPrDiscoveryTimeoutMs: () => 50,
   };
 });
 
@@ -330,6 +331,8 @@ describe("PrListController integration", () => {
 
   it("fcli emits no URL + user cancels prompt: watch stops without deploying", async () => {
     global.fetch = makeFetchStub({
+      "/user": [{ body: { login: "tester" } }],
+      "/repos/acme/app/pulls": [{ body: [] }],
       [pullPath("acme", "app", 300)]: [
         {
           body: buildPull({
@@ -356,6 +359,7 @@ describe("PrListController integration", () => {
 
     await waitFor(() => provider.getWatching() === false, {
       label: "watch cleared after user cancels URL prompt",
+      timeoutMs: 3000,
     });
 
     expect(getFakes().inputBox).toHaveBeenCalledTimes(1);

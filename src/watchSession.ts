@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import {
   buildHotfixCommand,
+  getHotfixPrDiscoveryTimeoutMs,
   getHotfixPrPollIntervalMs,
   getPollIntervalMs,
   getGhPath,
@@ -10,11 +11,16 @@ import {
   getWorktreePostCreateCommand,
 } from "./config";
 import { describeDeployOutcome, orchestrateDeployAfterFcli } from "./deployOrchestrator";
-import { runHotfixDeploy } from "./deployRun";
+import { runHotfixDeploy, getHotfixDeployOutputChannel } from "./deployRun";
+import { createDeployTracer } from "./deployTrace";
 import { getPullRequest } from "./githubClient";
 import { buildHotfixCliSuffix, type HotfixCliOptions } from "./hotfixCli";
 import { watchHotfixPrMerge } from "./hotfixPrMergeWatch";
-import { runHotfixShellCommandAfterMerge, type HotfixShellRunResult } from "./hotfixRun";
+import {
+  runHotfixShellCommandAfterMerge,
+  type HotfixShellRunResult,
+  getHotfixCliOutputChannel,
+} from "./hotfixRun";
 import { parseGithubPullUrl } from "./hotfixRunHelpers";
 import { killActiveChild } from "./runRegistry";
 import { phaseFromSettledPulls } from "./watchPoll";
@@ -371,7 +377,11 @@ export class WatchSession {
       postCreateCommand: getWorktreePostCreateCommand(),
     });
     const cwd = worktree.path;
+    const fcliStartedAtMs = Date.now();
     const cmd = buildHotfixCommand(mergedNumbers, ctx.cli, cwd);
+    getHotfixCliOutputChannel().appendLine(
+      `[deploy-trace] handleAllMerged: deploy=${deploy} env=${env} merged=#${mergedNumbers.join(", #")}`
+    );
     const runResult = await runHotfixShellCommandAfterMerge({
       command: cmd,
       cwd,
@@ -394,6 +404,7 @@ export class WatchSession {
         env,
         cwd,
         sourcePrNumbers: mergedNumbers,
+        runStartedAtMs: fcliStartedAtMs,
       });
     }
   }
@@ -403,8 +414,9 @@ export class WatchSession {
     env: HotfixCliOptions["env"];
     cwd: string;
     sourcePrNumbers: readonly number[];
+    runStartedAtMs: number;
   }): Promise<void> {
-    const { runResult, env, cwd, sourcePrNumbers } = params;
+    const { runResult, env, cwd, sourcePrNumbers, runStartedAtMs } = params;
     const abort = { aborted: this.aborted };
     this.currentDeployAbort = abort;
     const { owner: fallbackOwner, repo: fallbackRepo } = getRepoConfig();
@@ -415,6 +427,12 @@ export class WatchSession {
       prodWorkflow: wf.prodWorkflow,
       ref: wf.ref,
     };
+    const deployChannel = getHotfixDeployOutputChannel();
+    deployChannel.show(true);
+    const trace = createDeployTracer(deployChannel, getHotfixCliOutputChannel());
+    trace.info("handleDeployAfterFcli: deploy phase entered");
+    trace.detail("deployEnabled", true);
+    trace.detail("env", env);
 
     const result = await orchestrateDeployAfterFcli({
       runResult,
@@ -422,14 +440,17 @@ export class WatchSession {
       cwd,
       fallbackRepo: { owner: fallbackOwner, repo: fallbackRepo },
       sourcePrNumbers,
+      runStartedAtMs,
       deps: {
         resolveToken: () => this.deps.resolveToken(),
         watchPr: watchHotfixPrMerge,
         runDeploy: runHotfixDeploy,
         askForHotfixUrl: (fb) => this.deps.ui.askHotfixUrl(fb),
         pollIntervalMs: getHotfixPrPollIntervalMs(),
+        discoveryTimeoutMs: getHotfixPrDiscoveryTimeoutMs(),
         workflowsTargets,
         abort,
+        trace,
         hooks: {
           onResolvedPr: (parsed) => {
             this.watching = true;
@@ -483,11 +504,15 @@ export class WatchSession {
     });
 
     this.currentDeployAbort = null;
+    trace.info(`handleDeployAfterFcli: orchestrator result=${result.kind}`);
     this.applyDeployOutcome(result);
   }
 
   private applyDeployOutcome(result: Awaited<ReturnType<typeof orchestrateDeployAfterFcli>>): void {
     const desc = describeDeployOutcome(result);
+    getHotfixDeployOutputChannel().appendLine(
+      `[deploy-trace] applyDeployOutcome: kind=${result.kind} stopsWatch=${desc.stopsWatch} deployEnded=${desc.deployEnded}`
+    );
     if (desc.deployEnded) {
       this.deployRunning = false;
     }

@@ -39,6 +39,7 @@ const workflowsTargets: DeployTargets = {
 function makeDeps(overrides: Partial<DeployOrchestratorDeps> = {}): DeployOrchestratorDeps {
   return {
     resolveToken: vi.fn(async () => "t0k3n"),
+    waitForHotfixPr: vi.fn(async () => undefined),
     watchPr: vi.fn(
       async (_opts: HotfixPrMergeWatchOptions): Promise<HotfixPrMergeWatchResult> => ({
         kind: "merged",
@@ -48,6 +49,7 @@ function makeDeps(overrides: Partial<DeployOrchestratorDeps> = {}): DeployOrches
     runDeploy: vi.fn(async (): Promise<DeployRunResult> => ({ exitCode: 0, ok: true })),
     askForHotfixUrl: vi.fn(async () => undefined),
     pollIntervalMs: 1,
+    discoveryTimeoutMs: 50,
     workflowsTargets,
     abort: { aborted: false },
     ...overrides,
@@ -103,12 +105,35 @@ describe("orchestrateDeployAfterFcli", () => {
     const watchPr = vi.fn(async () => ({ kind: "merged" as const, pull: fakePull }));
     const runDeploy = vi.fn();
     const askForHotfixUrl = vi.fn(async () => undefined);
-    const deps = makeDeps({ watchPr, runDeploy, askForHotfixUrl });
+    const waitForHotfixPr = vi.fn(async () => undefined);
+    const deps = makeDeps({ watchPr, runDeploy, askForHotfixUrl, waitForHotfixPr });
     const result = await run(deps, { hotfixPrUrl: undefined });
     expect(result).toEqual({ kind: "cancelled_no_url" });
+    expect(waitForHotfixPr).toHaveBeenCalledOnce();
     expect(askForHotfixUrl).toHaveBeenCalledOnce();
     expect(watchPr).not.toHaveBeenCalled();
     expect(runDeploy).not.toHaveBeenCalled();
+  });
+
+  it("uses GitHub discovery when fcli emitted no URL", async () => {
+    const waitForHotfixPr = vi.fn(async () => ({
+      owner: "acme",
+      repo: "service",
+      prNumber: 88,
+    }));
+    const askForHotfixUrl = vi.fn(async () => undefined);
+    const runDeploy = vi.fn(
+      async (): Promise<DeployRunResult> => ({
+        exitCode: 0,
+        ok: true,
+      })
+    );
+    const deps = makeDeps({ waitForHotfixPr, askForHotfixUrl, runDeploy });
+    const result = await run(deps, { hotfixPrUrl: undefined, exitCode: undefined });
+    expect(result).toEqual({ kind: "deploy_succeeded" });
+    expect(waitForHotfixPr).toHaveBeenCalledOnce();
+    expect(askForHotfixUrl).not.toHaveBeenCalled();
+    expect(runDeploy).toHaveBeenCalledOnce();
   });
 
   it("accepts a user-typed URL from the prompt when fcli did not emit one", async () => {
@@ -517,9 +542,11 @@ describe("describeDeployOutcome", () => {
     });
   });
 
-  it("cancelled_no_url → silent stop", () => {
+  it("cancelled_no_url → warn toast, stops watch", () => {
     expect(describeDeployOutcome({ kind: "cancelled_no_url" })).toEqual({
-      severity: null,
+      severity: "warn",
+      message:
+        "Hotfix deploy cancelled: no hotfix PR URL from fcli, GitHub discovery timed out, and URL prompt was dismissed.",
       stopsWatch: true,
       deployEnded: false,
     });

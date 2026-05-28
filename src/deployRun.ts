@@ -28,6 +28,11 @@ export function registerHotfixDeployOutputChannel(context: vscode.ExtensionConte
   context.subscriptions.push(getDeployOutputChannel());
 }
 
+/** Exposed for deploy-phase tracing from {@link WatchSession}. */
+export function getHotfixDeployOutputChannel(): vscode.OutputChannel {
+  return getDeployOutputChannel();
+}
+
 function appendDeployHeader(ch: vscode.OutputChannel, env: HotfixCliEnv, script: string): void {
   ch.appendLine("");
   ch.appendLine(`── ${new Date().toISOString()} ──`);

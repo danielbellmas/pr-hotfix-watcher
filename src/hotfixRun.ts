@@ -37,6 +37,11 @@ export function registerHotfixCliOutputChannel(context: vscode.ExtensionContext)
   context.subscriptions.push(getOutputChannel());
 }
 
+/** Exposed for deploy-phase tracing from {@link WatchSession}. */
+export function getHotfixCliOutputChannel(): vscode.OutputChannel {
+  return getOutputChannel();
+}
+
 function appendRunHeader(ch: vscode.OutputChannel, prs: string, command: string): void {
   ch.appendLine("");
   ch.appendLine(`── ${new Date().toISOString()} ──`);
@@ -281,8 +286,11 @@ async function runHotfixIntegratedTerminal(
     autoFirstConfirm: autoFirst,
   });
   if (result.fallbackUsed) {
+    ch.appendLine(
+      "[deploy-trace] integrated terminal sendText fallback — fcli may still be running; deploy will poll GitHub for [Hotfix] PR"
+    );
     void vscode.window.showInformationMessage(
-      `Hotfix command sent to terminal "${terminalName}" for ${prs}. Complete YubiKey / prompts there — exit code is unavailable without shell integration.`
+      `Hotfix command sent to terminal "${terminalName}" for ${prs}. Complete YubiKey / prompts there — exit code is unavailable without shell integration. Deploy will watch GitHub for the new [Hotfix] PR.`
     );
   } else {
     notifyTerminalEnd(prs, result.exitCode, ch);
@@ -388,6 +396,17 @@ export async function runHotfixShellCommandAfterMerge(options: {
   const hotfixPrs = parseHotfixCliJson(raw.output);
   const hotfixPrUrl = hotfixPrs?.[0]?.htmlUrl ?? parseHotfixPrUrl(raw.output);
 
+  ch.appendLine(`[deploy-trace] fcli run mode=${mode}`);
+  ch.appendLine(`[deploy-trace] fcli exitCode=${raw.exitCode ?? "unknown"}`);
+  ch.appendLine(`[deploy-trace] fcli outputBytes=${raw.output.length}`);
+  ch.appendLine(`[deploy-trace] parsed hotfixPrUrl=${hotfixPrUrl ?? "(none)"}`);
+  ch.appendLine(`[deploy-trace] parsed hotfixPrs=${hotfixPrs?.length ?? 0}`);
+  if (mode === "integratedTerminal" && raw.output.length === 0) {
+    ch.appendLine(
+      "[deploy-trace] no fcli output captured — deploy will poll GitHub for [Hotfix] PR (common with terminal sendText fallback)"
+    );
+  }
+
   if (mode !== "integratedTerminal" && raw.exitCode === 0) {
     // Transparent-mode success milestone — fired here so we can include the
     // resolved PR URL when -o json was honored, falling back to a generic
@@ -441,7 +460,7 @@ export async function runHotfixShellCommandAfterMerge(options: {
 
   return {
     exitCode: raw.exitCode,
-    ok: raw.exitCode === 0,
+    ok: raw.exitCode === undefined || raw.exitCode === 0,
     hotfixPrUrl,
     hotfixPrs,
     output: raw.output,

@@ -2,7 +2,7 @@
   "name": "hotfix-watcher",
   "displayName": "Fordefi Hotfix Watcher",
   "description": "Watch selected GitHub PRs until merged, run a configurable hotfix CLI, then optionally dispatch the matching pre/prod deploy workflow(s).",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "fordefi",
   "icon": "media/icon.png",
   "license": "MIT",

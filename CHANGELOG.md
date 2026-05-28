@@ -2,6 +2,19 @@
 
 All notable changes to the Fordefi Hotfix Watcher extension will be documented in this file.
 
+## [0.1.6] - 2026-05-28
+
+### Fixed
+
+- Deploy phase no longer depends on fcli stdout when debug terminal uses
+  `sendText` fallback (returns before fcli finishes). Polls GitHub for a new
+  `[Hotfix]` PR by author before prompting for a URL.
+
+### Added
+
+- `[deploy-trace]` structured logging across fcli finish, deploy orchestration,
+  GitHub PR discovery, and outcome handling (Deploy + CLI output channels).
+
 ## [0.1.5] - 2026-05-28
 
 ### Fixed
