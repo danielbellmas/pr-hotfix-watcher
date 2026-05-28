@@ -2,7 +2,7 @@ import * as cp from "node:child_process";
 import { promisify } from "node:util";
 import * as vscode from "vscode";
 import { buildHotfixCliSuffix, type HotfixCliOptions } from "./hotfixCli";
-import { expandHotfixCommandTemplate } from "./hotfixCommandTemplate";
+import { expandHotfixCommandTemplate, stripFcliJsonOutputFlag } from "./hotfixCommandTemplate";
 import { parseHotfixRunMode, type HotfixRunMode } from "./hotfixRunHelpers";
 import { TokenResolver } from "./tokenResolver";
 
@@ -163,6 +163,12 @@ export function getHotfixPrPollIntervalMs(): number {
   return getPollIntervalMs();
 }
 
+export function getFcliJsonOutput(): boolean {
+  return Boolean(
+    vscode.workspace.getConfiguration("fordefiHotfix").get<boolean>("fcliJsonOutput", false)
+  );
+}
+
 export function buildHotfixCommand(
   prNumbers: number[],
   hotfixCli: HotfixCliOptions,
@@ -172,13 +178,17 @@ export function buildHotfixCommand(
   const repoRoot = repoRootOverride ?? getRepoRoot();
   const template = getCommandTemplate();
   const hotfixSuffix = buildHotfixCliSuffix(hotfixCli);
-  return expandHotfixCommandTemplate(template, {
+  let command = expandHotfixCommandTemplate(template, {
     repoRoot,
     owner,
     repo,
     prNumbers,
     hotfixSuffix,
   });
+  if (!getFcliJsonOutput()) {
+    command = stripFcliJsonOutputFlag(command);
+  }
+  return command;
 }
 
 /** Integrated terminal only: best-effort first prompt (no fcli `--yes` required). */

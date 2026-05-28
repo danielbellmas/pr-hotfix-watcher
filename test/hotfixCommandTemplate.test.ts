@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expandHotfixCommandTemplate } from "../src/hotfixCommandTemplate";
+import { expandHotfixCommandTemplate, stripFcliJsonOutputFlag } from "../src/hotfixCommandTemplate";
 
 describe("expandHotfixCommandTemplate", () => {
   const base = {
@@ -58,5 +58,35 @@ describe("expandHotfixCommandTemplate", () => {
       base
     );
     expect(out).toBe("./fcli workflows hotfix create-pull-request 1 3 -o json");
+  });
+});
+
+describe("stripFcliJsonOutputFlag", () => {
+  it("removes -o json from an fcli hotfix create-pull-request invocation", () => {
+    expect(
+      stripFcliJsonOutputFlag("./fcli workflows hotfix create-pull-request 12 34 --env pre -o json")
+    ).toBe("./fcli workflows hotfix create-pull-request 12 34 --env pre");
+  });
+
+  it("removes --output json variants", () => {
+    expect(
+      stripFcliJsonOutputFlag("./fcli workflows hotfix create-pull-request 1 --output json")
+    ).toBe("./fcli workflows hotfix create-pull-request 1");
+    expect(
+      stripFcliJsonOutputFlag("./fcli workflows hotfix create-pull-request 1 --output=json")
+    ).toBe("./fcli workflows hotfix create-pull-request 1");
+  });
+
+  it("preserves trailing shell-chain operators", () => {
+    expect(
+      stripFcliJsonOutputFlag(
+        "cd /repo && ./fcli workflows hotfix create-pull-request 1 --env pre -o json && echo done"
+      )
+    ).toBe("cd /repo && ./fcli workflows hotfix create-pull-request 1 --env pre && echo done");
+  });
+
+  it("leaves unrelated commands alone", () => {
+    expect(stripFcliJsonOutputFlag("echo hello")).toBe("echo hello");
+    expect(stripFcliJsonOutputFlag("./fcli something else 1 2")).toBe("./fcli something else 1 2");
   });
 });

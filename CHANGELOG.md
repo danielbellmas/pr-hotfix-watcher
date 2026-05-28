@@ -2,6 +2,13 @@
 
 All notable changes to the Fordefi Hotfix Watcher extension will be documented in this file.
 
+## [0.1.3] - 2026-05-28
+
+### Fixed
+
+- Strip `-o json` from fcli commands by default (most builds reject the flag)
+- Add `fordefiHotfix.fcliJsonOutput` to opt in when fcli supports `--output json`
+
 ## [0.1.2] - 2026-05-28
 
 ### Fixed

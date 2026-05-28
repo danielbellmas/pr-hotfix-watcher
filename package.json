@@ -2,7 +2,7 @@
   "name": "hotfix-watcher",
   "displayName": "Fordefi Hotfix Watcher",
   "description": "Watch selected GitHub PRs until merged, run a configurable hotfix CLI, then optionally dispatch the matching pre/prod deploy workflow(s).",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "fordefi",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -183,6 +183,11 @@
           "type": "string",
           "default": "cd {repoRoot} && ./fcli workflows hotfix create-pull-request {prNumbers} {hotfixSuffix}",
           "markdownDescription": "Shell command run after every selected PR is merged. Must include `{prNumbers}`.\n\nPlaceholders:\n- `{repoRoot}` — value of **Repo root**\n- `{prNumbers}` — space-separated PR numbers, ascending\n- `{prList}` — comma-separated PR numbers\n- `{owner}` / `{repo}` — from **Owner** / **Repo**\n- `{hotfixSuffix}` — fcli flags built from the **Hotfix CLI** row (env, draft, critical fast track)"
+        },
+        "fordefiHotfix.fcliJsonOutput": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "When **on**, keep `-o json` / `--output json` on the fcli `create-pull-request` invocation (from **commandTemplate**). Default **off** — the flag is stripped because most fcli builds reject it. Enable only after `./fcli workflows hotfix create-pull-request --help` lists `--output json`."
         },
         "fordefiHotfix.debugTerminal": {
           "type": "boolean",
