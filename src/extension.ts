@@ -94,6 +94,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("fordefiHotfix.refresh", () => provider.refresh()),
     vscode.commands.registerCommand("fordefiHotfix.startWatch", () => provider.startWatch()),
     vscode.commands.registerCommand("fordefiHotfix.stopWatch", () => provider.stopWatch()),
+    vscode.commands.registerCommand("fordefiHotfix.deployPre", () => provider.deployEnv("pre")),
+    vscode.commands.registerCommand("fordefiHotfix.deployProd", () => provider.deployEnv("prod")),
     vscode.commands.registerCommand("fordefiHotfix.doctor", () => runDoctor(context)),
     vscode.commands.registerCommand("fordefiHotfix.toggleDebugTerminal", async () => {
       const next = !isDebugTerminalEnabled();

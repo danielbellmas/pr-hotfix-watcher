@@ -679,4 +679,13 @@ describe("PrListController integration", () => {
     expect(firstCall[0]).toBe("gh");
     expect(firstCall[1]).toEqual(["auth", "token"]);
   });
+
+  it("manual deploy pre dispatches only the pre workflow", async () => {
+    mockedRunDeploy.mockResolvedValue({ exitCode: 0, ok: true });
+    const provider = new PrListController(fakeCtx());
+    await provider.deployEnv("pre");
+    expect(mockedRunDeploy).toHaveBeenCalledOnce();
+    expect(mockedRunDeploy.mock.calls[0]?.[0]?.env).toBe("pre");
+    expect(provider.getViewState().deployRunning).toBe(false);
+  });
 });

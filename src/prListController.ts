@@ -15,9 +15,12 @@ import {
   getHotfixCliOptionsFromConfig,
   getRecentPrCount,
   getRepoConfig,
+  getRepoRoot,
+  getWorkflowsRepoConfig,
   resolveGitHubToken,
 } from "./config";
-import { normalizeHotfixCliOptions, type HotfixCliOptions } from "./hotfixCli";
+import { runHotfixDeploy, getHotfixDeployOutputChannel } from "./deployRun";
+import { normalizeHotfixCliOptions, type HotfixCliEnv, type HotfixCliOptions } from "./hotfixCli";
 import {
   applyPrViewFilterSort,
   normalizePrListViewOptions,
@@ -107,6 +110,8 @@ export class PrListController {
   private prListView!: PrListViewOptions;
 
   private readonly watchSession: WatchSession;
+  private manualDeployRunning = false;
+  private lastDeployRunningContext: boolean | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const savedSelected = this.context.workspaceState.get<number[]>(SELECTED_PRS_KEY);
@@ -167,7 +172,7 @@ export class PrListController {
   }
 
   getViewState(): HotfixPrViewState {
-    this.watchSession.syncDeployRunningContext();
+    this.syncDeployRunningContext();
     return {
       rows: this.buildDisplayRows(),
       selected: this.getSelectedNumbers(),
@@ -191,8 +196,17 @@ export class PrListController {
       listLoading: this.listLoading,
       hotfixCli: { ...this.hotfixCli },
       prListView: { ...this.prListView },
-      deployRunning: this.watchSession.isDeployRunning(),
+      deployRunning: this.watchSession.isDeployRunning() || this.manualDeployRunning,
     };
+  }
+
+  private syncDeployRunningContext(): void {
+    const running = this.watchSession.isDeployRunning() || this.manualDeployRunning;
+    if (this.lastDeployRunningContext === running) {
+      return;
+    }
+    this.lastDeployRunningContext = running;
+    void vscode.commands.executeCommand("setContext", "fordefiHotfix.deployRunning", running);
   }
 
   setHotfixCliOptions(partial: Partial<HotfixCliOptions>): void {
@@ -470,6 +484,46 @@ export class PrListController {
 
   stopWatch(): void {
     this.watchSession.stop();
+  }
+
+  /** Dispatch pre or prod workflow(s) immediately — no watch / fcli required. */
+  async deployEnv(env: Exclude<HotfixCliEnv, "both">): Promise<void> {
+    if (this.watchSession.isDeployRunning() || this.manualDeployRunning) {
+      void vscode.window.showWarningMessage("A hotfix deploy is already running.");
+      return;
+    }
+    if (this.watchSession.isWatching()) {
+      void vscode.window.showWarningMessage("Stop live watch before manual deploy.");
+      return;
+    }
+    const cwd = getRepoRoot();
+    if (!cwd) {
+      void vscode.window.showErrorMessage(
+        "Open a workspace folder, or set Hotfix › Repo root in settings."
+      );
+      return;
+    }
+    const wf = getWorkflowsRepoConfig();
+    const targets = {
+      repoSlug: `${wf.owner}/${wf.repo}`,
+      preWorkflow: wf.preWorkflow,
+      prodWorkflow: wf.prodWorkflow,
+      ref: wf.ref,
+    };
+    const ch = getHotfixDeployOutputChannel();
+    ch.show(true);
+    ch.appendLine(`[deploy-trace] manual deploy env=${env} cwd=${cwd}`);
+
+    this.manualDeployRunning = true;
+    this.syncDeployRunningContext();
+    this._onDidChangeTreeData.fire(undefined);
+    try {
+      await runHotfixDeploy({ env, targets, cwd });
+    } finally {
+      this.manualDeployRunning = false;
+      this.syncDeployRunningContext();
+      this._onDidChangeTreeData.fire(undefined);
+    }
   }
 
   /** @internal — exposed for integration tests. Not part of the public API. */

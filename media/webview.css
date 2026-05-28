@@ -473,3 +473,21 @@ body {
   cursor: pointer;
   accent-color: var(--vscode-button-background);
 }
+.deploy-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--vscode-widget-border) 80%, transparent);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  cursor: pointer;
+  font: inherit;
+  font-size: calc(var(--vscode-font-size) - 1px);
+  line-height: 1.2;
+}
+.deploy-btn:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+.deploy-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

@@ -60,6 +60,19 @@
   if (ftCb) ftCb.addEventListener("change", postHotfixCli);
   if (deployCb) deployCb.addEventListener("change", postHotfixCli);
 
+  const deployPreBtn = document.getElementById("deployPreBtn");
+  const deployProdBtn = document.getElementById("deployProdBtn");
+  if (deployPreBtn) {
+    deployPreBtn.addEventListener("click", () => {
+      vscode.postMessage({ command: "deployEnv", env: "pre" });
+    });
+  }
+  if (deployProdBtn) {
+    deployProdBtn.addEventListener("click", () => {
+      vscode.postMessage({ command: "deployEnv", env: "prod" });
+    });
+  }
+
   const statusSel = document.getElementById("prStatusFilterSel");
   const sortSel = document.getElementById("prSortSel");
   function postPrListView() {
@@ -106,6 +119,12 @@
       if (deployCb.checked !== Boolean(state.hotfixCli.deploy)) {
         deployCb.checked = Boolean(state.hotfixCli.deploy);
       }
+    }
+    if (deployPreBtn) {
+      deployPreBtn.disabled = Boolean(state.deployRunning || state.watching);
+    }
+    if (deployProdBtn) {
+      deployProdBtn.disabled = Boolean(state.deployRunning || state.watching);
     }
     if (state.prListView && statusSel && sortSel) {
       if (statusSel.value !== state.prListView.statusFilter) {

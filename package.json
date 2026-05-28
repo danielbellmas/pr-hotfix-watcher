@@ -2,7 +2,7 @@
   "name": "hotfix-watcher",
   "displayName": "Fordefi Hotfix Watcher",
   "description": "Watch selected GitHub PRs until merged, run a configurable hotfix CLI, then optionally dispatch the matching pre/prod deploy workflow(s).",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "fordefi",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -88,6 +88,16 @@
         "command": "fordefiHotfix.openWorktreeTerminal",
         "category": "Hotfix",
         "title": "Open hotfix worktree terminal"
+      },
+      {
+        "command": "fordefiHotfix.deployPre",
+        "category": "Hotfix",
+        "title": "Deploy pre hotfix workflow"
+      },
+      {
+        "command": "fordefiHotfix.deployProd",
+        "category": "Hotfix",
+        "title": "Deploy prod hotfix workflow"
       }
     ],
     "menus": {
@@ -127,6 +137,14 @@
         },
         {
           "command": "fordefiHotfix.toggleDebugTerminal",
+          "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.deployPre",
+          "when": "true"
+        },
+        {
+          "command": "fordefiHotfix.deployProd",
           "when": "true"
         },
         {

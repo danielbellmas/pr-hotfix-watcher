@@ -16,6 +16,7 @@ type FromWebview =
       criticalFastTrack?: boolean;
       deploy?: boolean;
     }
+  | { command: "deployEnv"; env?: string }
   | { command: "prListView"; statusFilter?: string; sortMode?: string };
 
 export type GithubPrColorScheme = "light" | "dark";
@@ -141,6 +142,12 @@ export class HotfixPrWebviewProvider implements vscode.WebviewViewProvider {
         p.deploy = msg.deploy;
       }
       this.prs.setHotfixCliOptions(p);
+      return;
+    }
+    if (msg.command === "deployEnv") {
+      if (msg.env === "pre" || msg.env === "prod") {
+        void this.prs.deployEnv(msg.env);
+      }
       return;
     }
     if (msg.command === "prListView") {

@@ -2,6 +2,13 @@
 
 All notable changes to the Fordefi Hotfix Watcher extension will be documented in this file.
 
+## [0.1.7] - 2026-05-28
+
+### Added
+
+- **Deploy pre** / **Deploy prod** toolbar buttons for one-shot workflow dispatch (no
+  watch or fcli). Also available via Command Palette.
+
 ## [0.1.6] - 2026-05-28
 
 ### Fixed

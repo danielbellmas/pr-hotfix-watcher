@@ -65,6 +65,26 @@
         </label>
       </div>
       <div class="tb-divider" aria-hidden="true"></div>
+      <div class="tb-group" aria-label="Manual deploy">
+        <span class="tb-label">Deploy</span>
+        <button
+          type="button"
+          id="deployPreBtn"
+          class="deploy-btn"
+          title="Dispatch the pre-hotfix workflow only (no watch / fcli)."
+        >
+          pre
+        </button>
+        <button
+          type="button"
+          id="deployProdBtn"
+          class="deploy-btn"
+          title="Dispatch the production-hotfix workflow only (no watch / fcli)."
+        >
+          prod
+        </button>
+      </div>
+      <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-group" aria-label="View">
         <span class="tb-label">View</span>
         <select id="prStatusFilterSel" class="cli-select" aria-label="Filter by PR status">
